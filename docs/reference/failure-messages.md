@@ -10,6 +10,8 @@ Actual events:
 
 When an exception caused the failure, it is the `InnerException`. Payloads are serialized with the store's own Marten serializer.
 
+A `When` or `WhenQuery` step is labelled with its message type, such as `When(RenameWidget)`. If the factory threw or returned null there is no message, so the label is just `When` or `WhenQuery<TResponse>`.
+
 ## Infrastructure failures
 
 These are test setup problems. They fail the scenario at the step where they happen, and `ThenThrows` can't claim them.

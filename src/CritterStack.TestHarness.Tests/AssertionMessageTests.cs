@@ -118,6 +118,91 @@ public sealed class AssertionMessageTests(NoDaemonHostFixture fixture)
             .WhenQuery<WidgetSummary?>(() => new FindWidget(id)));
 
         Assert.StartsWith("step 1 GivenStream<Widget>", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("writing the Given failed with ExistingStreamIdCollisionException", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("use a fresh id per test", failure.Message, StringComparison.Ordinal);
         Assert.IsType<ExistingStreamIdCollisionException>(failure.InnerException);
+    }
+
+    [Fact]
+    [Trait("business_value", "A bug in the test's own Given setup code is reported against that Given, with the original exception attached.")]
+    public async Task Given_events_factory_that_throws_fails_at_that_step()
+    {
+        var boom = new InvalidOperationException("bad test data");
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .GivenStream<Widget>(Guid.NewGuid(), _ => throw boom)
+            .When(() => new UnhandledCommand()));
+
+        Assert.StartsWith("step 1 GivenStream<Widget>", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("building the events threw InvalidOperationException", failure.Message, StringComparison.Ordinal);
+        Assert.Same(boom, failure.InnerException);
+    }
+
+    [Fact]
+    [Trait("business_value", "A bug in the test's command factory is reported as a test bug, not a handler failure, and ThenThrows can't hide it.")]
+    public async Task Command_factory_that_throws_fails_at_once_and_cannot_be_claimed()
+    {
+        var boom = new InvalidOperationException("bad command");
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .When(() => throw boom)
+            .ThenThrows<InvalidOperationException>());
+
+        // The factory never produced a message, so the label has no message type.
+        Assert.StartsWith("step 1 When: building the command threw InvalidOperationException", failure.Message, StringComparison.Ordinal);
+        Assert.Same(boom, failure.InnerException);
+    }
+
+    [Fact]
+    [Trait("business_value", "A query factory that throws is reported as a test bug with the original exception attached.")]
+    public async Task Query_factory_that_throws_fails_at_once()
+    {
+        var boom = new InvalidOperationException("bad query");
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .WhenQuery<WidgetSummary?>(() => throw boom)
+            .ThenResult(_ => true));
+
+        Assert.StartsWith("step 1 WhenQuery<WidgetSummary>: building the query threw InvalidOperationException", failure.Message, StringComparison.Ordinal);
+        Assert.Same(boom, failure.InnerException);
+    }
+
+    [Fact]
+    [Trait("business_value", "A factory that returns null is caught clearly instead of surfacing as an obscure Wolverine error.")]
+    public async Task Factory_that_returns_null_fails_clearly()
+    {
+        var command = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .When(() => null!));
+        var query = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .WhenQuery<WidgetSummary?>(() => null!));
+
+        Assert.Contains("the command factory returned null", command.Message, StringComparison.Ordinal);
+        Assert.Contains("the query factory returned null", query.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("business_value", "A predicate that throws (for example a null dereference) is reported as such, with the original exception attached.")]
+    public async Task Predicate_that_throws_is_reported_with_its_exception()
+    {
+        var id = Guid.NewGuid();
+        var boom = new InvalidOperationException("bad predicate");
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .GivenStream<Widget>(id, i => [new WidgetCreated(i, "Sprocket")])
+            .When(() => new RenameWidget(id, "Gear"))
+            .ThenAppended<WidgetRenamed>(id, _ => throw boom));
+
+        Assert.StartsWith("step 3 ThenAppended<WidgetRenamed>", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("the predicate threw InvalidOperationException", failure.Message, StringComparison.Ordinal);
+        Assert.Same(boom, failure.InnerException);
+    }
+
+    [Fact]
+    [Trait("business_value", "ThenPublished after a claimed throw explains there is nothing to check instead of reporting an empty list.")]
+    public async Task ThenPublished_after_a_throw_explains_there_is_no_session()
+    {
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .When(() => new FailWidget(Guid.NewGuid()))
+            .ThenThrows<WidgetException>()
+            .ThenPublished<WidgetPublishedNotice>());
+
+        Assert.StartsWith("step 3 ThenPublished<WidgetPublishedNotice>", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("When(FailWidget) threw, so there is no tracked session to check", failure.Message, StringComparison.Ordinal);
     }
 }
