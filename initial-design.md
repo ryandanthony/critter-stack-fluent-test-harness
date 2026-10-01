@@ -299,10 +299,35 @@ Every test gets a `business_value` trait that states what the test protects.
 
 ## Todos
 
-- [ ] **verify-apis:** Use Context7 to confirm the Marten 9 catch-up and conjoined-tenancy APIs, the Wolverine 6 tracking and tenant-invoke APIs, and the exception types the infrastructure-failure classifier must recognise.
-- [ ] **scaffold:** Add the repo scaffolding (`src/Directory.Packages.props`, `src/Directory.Build.props`, `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes).
-- [ ] **project:** Create the `CritterStack.TestHarness` and `CritterStack.TestHarness.Tests` projects.
-- [ ] **core:** Implement `TestHarness.Setup`, `HarnessOptions`, `ScenarioBuilder` (deferred, awaitable) and `ScenarioContext`.
-- [ ] **steps:** Implement the Given/When/WhenQuery/Then steps, plus `ScenarioAssertionException` with JSON payloads of the actual events and query response in its messages.
-- [ ] **tests:** Build the `TestHarness.Tests` Widget test domain, the Postgres and Alba fixtures (with and without a daemon) and the harness test suites.
-- [ ] **verify:** Run `just build` and `just test` until both are green.
+In build order. Each item lists what "done" means.
+
+- [ ] **verify-apis:** Use Context7 to confirm, for the pinned Marten 9 and Wolverine 6 versions:
+  - Marten: `ForceAllMartenDaemonActivityToCatchUpAsync`, `WaitForNonStaleProjectionDataAsync`, `FetchStreamAsync`, `FetchStreamStateAsync`, `StartStream`/`Append`, conjoined event tenancy, and `Options.Serializer()`;
+  - Wolverine: `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on `IMessageContext` and `IMessageBus`), the `ITrackedSession` shape (for `ThenPublished`), tracking options for `TrackingTimeout` and `IncludeExternalMessages`, and `MessageStorageSchemaName` on `IntegrateWithWolverine`;
+  - the exception types for each infrastructure failure (wrong `TResponse`, tracking timeout, no handler, sync timeout, stream id collision) and how a handler exception surfaces from tracking (direct or wrapped in `AggregateException`);
+  - Alba's version is compatible with Wolverine 6.
+  - Update the design (pinned versions, API names, the **Risks** section) wherever something differs.
+- [ ] **scaffold:** Add `src/Directory.Packages.props` (pinned versions), `src/Directory.Build.props` (target framework, nullable, implicit usings, xunit v3 and the test SDK for `*.Tests`), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `just build` succeeds on an empty solution.
+- [ ] **project:** Create both projects and add them to the slnx:
+  - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
+  - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten and Testcontainers.PostgreSql).
+- [ ] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`. The Target API sample compiles, and a misordered chain doesn't.
+- [ ] **core:** Implement the internal plumbing:
+  - `ScenarioBuilder` (records steps, holds the tenant id, implements `IScenarioStart`, `IGivenStage` and `ICommandStage`) and `QueryStage<TResponse>` (forwards to the builder);
+  - `IScenarioStep` and `ScenarioRunner`: runs steps in order on `RunAsync`/`GetAwaiter`, honours the `CancellationToken`, and pre-scans the steps to find which stream ids each `When` must snapshot;
+  - `ScenarioContext`: host, tenant, tracked session, pending/claimed exception, last query result, stream-version snapshots, the started-stream set and the projection-sync "dirty" flag;
+  - tenant-aware session and invoke helpers (one code path with and without a tenant);
+  - projection sync (`CatchUp`, `WaitForNonStale`, `None`) with the dirty flag, `ProjectionTimeout`, and an internal hook that counts sync calls;
+  - the exception classifier (handler exception vs infrastructure failure) and the unclaimed-exception rule (fail at the first non-`ThenThrows` `Then`, the next `When`/`WhenQuery`, or the end);
+  - `ScenarioAssertionException` and a failure-message formatter that writes step name, event versions, type names and JSON payloads with the store's serializer, and attaches `InnerException` when caused by an exception.
+- [ ] **steps:** Implement each step on top of `core`:
+  - `GivenStreamStep` (start on first use of an id, append after);
+  - `WhenCommandStep` (sync if dirty, snapshot versions, tracked invoke, capture handler exception, keep `ITrackedSession`);
+  - `WhenQueryStep` (sync if dirty, invoke, capture handler exception, store typed result);
+  - `StreamAssertionStep` (has / has-no with predicate / count, whole stream);
+  - `AppendedAssertionStep` (appended / not-appended with predicate / count, since the snapshot);
+  - `ThrowsAssertionStep`, `PublishedAssertionStep` and `ResultAssertionStep`.
+- [ ] **test-domain:** Build `TestDomain/`: the `Widget` aggregate, its events, the `RenameWidget`, `PublishWidget`, `FailWidget`, `StallWidget` and `ArchiveWidget` commands and handlers, the `GetWidgetById` query and handler, and the `WidgetDetails` (inline) and `WidgetSummary` (async) projections.
+- [ ] **fixtures:** Build `PostgresContainerFixture` (assembly fixture), the abstract `HarnessHostFixture` with conjoined tenancy and per-host schemas, `NoDaemonHostFixture`, `DaemonHostFixture`, and the `NoDaemonCollection` and `DaemonCollection` definitions. Each host starts and stops cleanly against the shared container.
+- [ ] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait.
+- [ ] **verify:** Run `just build` and `just test` until both are green with no warnings. Requires Docker for Testcontainers.
