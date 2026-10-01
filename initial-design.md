@@ -78,7 +78,7 @@ flowchart LR
     Exec --> Query["WhenQuery: IMessageBus.InvokeAsync / InvokeForTenantAsync of TResponse"]
 ```
 
-- **Deferred execution:** each fluent call adds a step to a list. `RunAsync()` (or awaiting the builder through `GetAwaiter`) runs the steps in order. This lets the builder chain synchronously, as in your sketch.
+- **Deferred execution:** each fluent call adds a step to a list. `RunAsync()` (or awaiting the builder through `GetAwaiter`) runs the steps in order. This lets the whole scenario read as one synchronous chain.
 - **Portability rule:** the harness depends only on the Alba, Marten and Wolverine abstractions. It has no knowledge of any service's aggregates, projections, schemas, fixtures or transports, so you can copy the project into another service and use it unchanged. Everything that varies between services is set through `HarnessOptions`.
 - **Setup:** `TestHarness.Setup(IHost host, Action<HarnessOptions>? configure)`. `IAlbaHost` is an `IHost`, so any service's existing Alba fixture works. The harness never builds or owns a host; the caller's fixture owns the host, containers and lifetime. Options:
   - `ProjectionSync`, one of:
@@ -131,11 +131,11 @@ flowchart LR
 - **Thens:**
   - **Appended-event assertions** (command stage only). These check only the events the most recent `When` appended:
     - `ThenAppended<T>(id, predicate?)`
-    - `ThenNotAppended<T>(id)`
+    - `ThenNotAppended<T>(id, predicate?)`
     - `ThenAppendedCount(id, n)`
   - **Whole-stream assertions** (after any `When` or `WhenQuery`). These read the full stream with `FetchStreamAsync`, including events from Givens and from earlier `When`s:
     - `ThenStreamHasEvent<T>(id, predicate?)`
-    - `ThenStreamHasNoEvent<T>(id)`
+    - `ThenStreamHasNoEvent<T>(id, predicate?)`
     - `ThenStreamEventCount(id, n)`
   - `ThenThrows<TException>(predicate?)`, valid after a `When` or a `WhenQuery`.
   - `ThenPublished<TMessage>(predicate?)`, which reads from the tracked session and is valid only after a `When`.
@@ -193,7 +193,7 @@ public interface IThenStage<out TSelf> : IScenario
     where TSelf : IThenStage<TSelf>
 {
     TSelf ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
-    TSelf ThenStreamHasNoEvent<TEvent>(Guid id);
+    TSelf ThenStreamHasNoEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
     TSelf ThenStreamEventCount(Guid id, int expected);
 
     TSelf ThenThrows<TException>(Func<TException, bool>? predicate = null) where TException : Exception;
@@ -206,7 +206,7 @@ public interface IThenStage<out TSelf> : IScenario
 public interface ICommandStage : IThenStage<ICommandStage>
 {
     ICommandStage ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
-    ICommandStage ThenNotAppended<TEvent>(Guid id);
+    ICommandStage ThenNotAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
     ICommandStage ThenAppendedCount(Guid id, int expected);
 
     ICommandStage ThenPublished<TMessage>(Func<TMessage, bool>? predicate = null);
@@ -270,8 +270,8 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - an aggregate, `Widget`;
   - events `WidgetCreated`, `WidgetRenamed` and `WidgetPublished`;
   - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message), `FailWidget` (whose handler throws `WidgetException`), `StallWidget` (whose handler waits longer than a short test `TrackingTimeout`, to prove timeouts can't be claimed) and `ArchiveWidget` (whose handler loads the async `WidgetSummary` read model and throws if it is missing, to prove the sync before a `When`);
-  - a query `GetWidgetById` plus its handler, which throws `WidgetNotFoundException` for an unknown id;
-  - one inline read model and one async read model, `WidgetSummary`.
+  - a query `GetWidgetById` plus its handler, which returns the async `WidgetSummary` read model and throws `WidgetNotFoundException` for an unknown id;
+  - two read models: `WidgetDetails` (inline projection, always current after `SaveChanges`) and `WidgetSummary` (async projection, only current after projection sync). The `CatchUp`, `WaitForNonStale` and `None` tests all use `WidgetSummary`.
 - `Infrastructure/PostgresContainerFixture.cs`: an xUnit v3 assembly fixture (`[assembly: AssemblyFixture(typeof(PostgresContainerFixture))]`) that starts one Postgres Testcontainer for the whole test assembly and exposes its connection string.
 - `Infrastructure/HarnessHostFixture.cs`: an abstract base that takes the container fixture and builds `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. The event store uses conjoined tenancy (`Events.TenancyStyle = TenancyStyle.Conjoined`) and Wolverine's Marten integration routes invokes by tenant id, so `ForTenant` can be tested; scenarios without `ForTenant` run on the default tenant. Each subclass sets its own schema (`DatabaseSchemaName`, `Events.DatabaseSchemaName` and Wolverine's message storage schema through `IntegrateWithWolverine(x => x.MessageStorageSchemaName = ...)`), so the two hosts never see each other's events, read models or envelopes:
   - `NoDaemonHostFixture`: schema `harness_nodaemon`, no daemon registered, so `CatchUp` is proven against a host that has none and `None` reliably leaves the async read model stale.
@@ -305,6 +305,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - a `When` or `WhenQuery` that throws with no `ThenThrows` after it fails the scenario as an unexpected exception;
   - a `When` that throws, followed by `ThenAppended` and then `ThenThrows`, fails at `ThenAppended` with "`When` threw `<type>`" (not "no event appended"), and the handler exception is the `InnerException`;
   - `ThenThrows` followed by `ThenNotAppended` passes when the handler threw and appended nothing;
+  - `ThenStreamHasNoEvent<WidgetRenamed>(id, e => e.Name == "Gear")` passes when the stream only has a rename to another name, and fails when it has a rename to `"Gear"`; the same for `ThenNotAppended`;
   - `ThenResult` after a query that threw fails with a clear message;
   - `ThenThrows` when nothing was thrown fails;
   - `WhenQuery<TResponse>` with the wrong response type surfaces as a `ScenarioAssertionException` that names the step and keeps Wolverine's exception as `InnerException`;
