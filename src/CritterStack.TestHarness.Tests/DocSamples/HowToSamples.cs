@@ -218,7 +218,7 @@ public sealed class HowToSamples(NoDaemonHostFixture fixture)
     {
         var id = Guid.NewGuid();
 
-        var failure = await Assert.ThrowsAsync<ScenarioAssertionException>(() => TestHarness
+        var failure = await Assert.ThrowsAsync<HarnessAssertionException>(() => TestHarness
             .Setup(fixture.Host)
             .GivenStream<Widget>(id, i => [new WidgetCreated(i, "Sprocket")])
             .When(() => new RenameWidget(id, "Cog"))
@@ -237,7 +237,7 @@ public sealed class HowToSamples(NoDaemonHostFixture fixture)
     {
         var id = Guid.NewGuid();
 
-        var failure = await Assert.ThrowsAsync<ScenarioAssertionException>(() => TestHarness
+        var failure = await Assert.ThrowsAsync<HarnessAssertionException>(() => TestHarness
             .Setup(fixture.Host)
             .When(() => new FailWidget(id))
             .ThenAppended<WidgetRenamed>(id)

@@ -7,7 +7,7 @@
 namespace CritterStack.TestHarness.Internal;
 
 /// <summary>
-/// Builds <see cref="ScenarioAssertionException"/>s with a consistent "step: message" shape.
+/// Builds <see cref="HarnessAssertionException"/>s with a consistent "step: message" shape.
 /// </summary>
 internal static class Failure
 {
@@ -18,7 +18,7 @@ internal static class Failure
     /// <param name="message">What went wrong.</param>
     /// <param name="innerException">The exception that caused the failure, if any.</param>
     /// <returns>The exception to throw.</returns>
-    internal static ScenarioAssertionException Create(string stepLabel, string message, Exception? innerException = null) =>
+    internal static HarnessAssertionException Create(string stepLabel, string message, Exception? innerException = null) =>
         new($"{stepLabel}: {message}", innerException);
 
     /// <summary>

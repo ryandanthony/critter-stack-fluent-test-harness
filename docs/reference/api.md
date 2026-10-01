@@ -122,7 +122,7 @@ Appended-event assertions only see events the most recent `When` appended: the h
 ### `RunAsync(CancellationToken cancellationToken = default)`
 
 - **Does:** runs every recorded step in order.
-- **Fails:** `ScenarioAssertionException` for the first failing step. See [failure messages](failure-messages.md).
+- **Fails:** `HarnessAssertionException` for the first failing step. See [failure messages](failure-messages.md).
 
 ### `GetAwaiter()`
 
@@ -132,6 +132,6 @@ Appended-event assertions only see events the most recent `When` appended: the h
 
 See [harness options](harness-options.md).
 
-## `ScenarioAssertionException`
+## `HarnessAssertionException`
 
 The only exception the harness throws for a failing scenario. `Message` starts with the step (`step 3 ThenAppended<WidgetRenamed>(...)`, or `end of scenario`). `InnerException` is the original exception when one caused the failure.

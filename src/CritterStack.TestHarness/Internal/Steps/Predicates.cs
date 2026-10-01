@@ -17,7 +17,7 @@ internal static class Predicates
     /// <param name="context">The scenario context, for the step label.</param>
     /// <param name="predicateCall">The predicate call.</param>
     /// <returns>The predicate's result.</returns>
-    /// <exception cref="ScenarioAssertionException">The predicate threw.</exception>
+    /// <exception cref="HarnessAssertionException">The predicate threw.</exception>
     internal static bool Evaluate(ScenarioContext context, Func<bool> predicateCall)
     {
         try

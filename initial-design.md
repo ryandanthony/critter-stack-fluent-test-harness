@@ -95,7 +95,7 @@ flowchart LR
   - If the command throws, the harness captures the exception for `ThenThrows<T>` instead of failing straight away.
 - **Captured exceptions (When and WhenQuery alike):**
   - Both `When` and `WhenQuery` capture an exception thrown by the *handler* instead of failing straight away.
-  - Only handler exceptions can be claimed. Harness and infrastructure failures are test setup bugs, not behaviour under test, so they fail the scenario at once with a `ScenarioAssertionException` that names the step:
+  - Only handler exceptions can be claimed. Harness and infrastructure failures are test setup bugs, not behaviour under test, so they fail the scenario at once with a `HarnessAssertionException` that names the step:
     - `WhenQuery<TResponse>` where the handler's response isn't a `TResponse`;
     - a Wolverine tracking timeout on `When` (`TrackingTimeout` exceeded);
     - no handler registered for the command or query;
@@ -129,7 +129,7 @@ flowchart LR
     ```
   - Once claimed, the exception no longer blocks later `Then`s. `ThenResult` after a claimed query exception still fails, with "query threw `<type>`, no result" rather than a null-reference error.
   - `ThenThrows` after a `When` or `WhenQuery` that didn't throw fails with "expected `<type>`, nothing thrown".
-  - Every `ScenarioAssertionException` caused by an exception (unclaimed handler exceptions and the infrastructure failures above) keeps the original as `InnerException`, so its message and stack trace show up in test output. This is deliberate: the harness only runs in tests, so being able to debug a failure matters more than hiding exception text. The harness's own message still leads with the step name and exception type so the cause is obvious at a glance.
+  - Every `HarnessAssertionException` caused by an exception (unclaimed handler exceptions and the infrastructure failures above) keeps the original as `InnerException`, so its message and stack trace show up in test output. This is deliberate: the harness only runs in tests, so being able to debug a failure matters more than hiding exception text. The harness's own message still leads with the step name and exception type so the cause is obvious at a glance.
 - **Thens:**
   - **Appended-event assertions** (command stage only). These check only the events the most recent `When` appended:
     - `ThenAppended<T>(id, predicate?)`
@@ -151,7 +151,7 @@ flowchart LR
   - Projection sync runs before each `When` and `WhenQuery` when anything has been written since the last sync (see **Projection sync**).
   - `ThenThrows`, `ThenResult`, `ThenPublished` and the appended-event assertions refer to the most recent `When` or `WhenQuery` before them. Whole-stream assertions always see the whole stream as it is when they run.
 - **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs projection sync if needed, then runs `IMessageBus.InvokeAsync<object>` (or `InvokeForTenantAsync<object>`), checks the result is a `TResponse` (see **Captured exceptions**) and stores it typed. Queries are not tracked, so anything a query handler cascades is not waited for. `ThenResult(Func<TResponse, bool>)` asserts on the response with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
-- **Failures:** the harness throws `ScenarioAssertionException`. The message names the failing step, then shows what was actually there so a failed predicate is easy to diagnose:
+- **Failures:** the harness throws `HarnessAssertionException`. The message names the failing step, then shows what was actually there so a failed predicate is easy to diagnose:
   - stream assertions list each relevant event (the whole stream, or only the appended events for `ThenAppended*`) with its version, type name and JSON payload;
   - `ThenResult` shows the query response as JSON;
   - `ThenPublished` lists the tracked messages with their type names and JSON payloads.
@@ -325,7 +325,7 @@ Public API (namespace `CritterStack.TestHarness`):
 
 - `TestHarness.cs`: static `Setup` entry point.
 - `HarnessOptions.cs` and `ProjectionSync.cs` (the sync-mode enum).
-- `ScenarioAssertionException.cs`
+- `HarnessAssertionException.cs`
 - `Stages/`: `IScenario.cs`, `IScenarioStart.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
 
 Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
@@ -363,13 +363,13 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - a stream given under tenant `a` is not visible to a scenario that uses `ForTenant("b")` (`ThenStreamEventCount(id, 0)`);
   - `WhenQuery` under `ForTenant` returns that tenant's read model;
   - steps run only on `RunAsync` or `await`;
-  - a failed `ThenStreamHasEvent` throws `ScenarioAssertionException` whose message includes each actual event's version, type name and JSON payload;
+  - a failed `ThenStreamHasEvent` throws `HarnessAssertionException` whose message includes each actual event's version, type name and JSON payload;
   - a failed `ThenResult` includes the response as JSON in its message;
   - `ThenAppended<WidgetCreated>` fails after a `When` when `WidgetCreated` came only from the Given, while `ThenStreamHasEvent<WidgetCreated>` passes;
   - after two `When`s, `ThenAppended` and `ThenAppendedCount` see only the second command's events;
   - `ThenAppended` works on a stream that the `When` itself creates (snapshot version 0);
   - `ThenThrows` captures a handler exception;
-  - a tracking timeout fails the scenario at once as a `ScenarioAssertionException` naming the `When` step, and `ThenThrows<TimeoutException>()` cannot claim it;
+  - a tracking timeout fails the scenario at once as a `HarnessAssertionException` naming the `When` step, and `ThenThrows<TimeoutException>()` cannot claim it;
   - a `When` with no registered handler fails at once and cannot be claimed;
   - `ThenPublished` sees the cascaded message;
   - in `CatchUp` mode, `WhenQuery`/`ThenResult` reads the async read model;
@@ -387,13 +387,13 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - `ThenStreamHasNoEvent<WidgetRenamed>(id, e => e.Name == "Gear")` passes when the stream only has a rename to another name, and fails when it has a rename to `"Gear"`; the same for `ThenNotAppended`;
   - `ThenResult` after a query that threw fails with a clear message;
   - `ThenThrows` when nothing was thrown fails;
-  - `WhenQuery<string>` against a handler that returns `WidgetSummary` fails at once with a `ScenarioAssertionException` naming the step, the expected type and the actual type (Wolverine itself throws nothing);
+  - `WhenQuery<string>` against a handler that returns `WidgetSummary` fails at once with a `HarnessAssertionException` naming the step, the expected type and the actual type (Wolverine itself throws nothing);
   - a query whose handler returns `null` passes `null` to `ThenResult`'s predicate rather than failing;
   - a cascaded handler that throws surfaces as an `AggregateException` and `ThenThrows<WidgetException>()` still claims it;
   - a `When` command whose handler throws a `TimeoutException` of its own is claimable, while the tracked session's timeout is not;
   - `CatchUp` takes the `ForceAll…` path on the daemon host and the `BuildProjectionDaemonAsync` path on the no-daemon host, and both leave `WidgetSummary` current;
   - a Given that reuses an existing stream id fails at once with `ExistingStreamIdCollisionException` as `InnerException`;
-  - an unclaimed handler exception's `ScenarioAssertionException` has the original handler exception as `InnerException`.
+  - an unclaimed handler exception's `HarnessAssertionException` has the original handler exception as `InnerException`.
 - Package needs: Alba, Marten, WolverineFx, WolverineFx.Marten, WolverineFx.RuntimeCompilation and Testcontainers.PostgreSql, all pinned in `src/Directory.Packages.props`. xunit v3 comes from `src/Directory.Build.props` for `*.Tests`.
 - Both host fixtures register handlers with `opts.Discovery.IncludeType(...)` for each `TestDomain` handler class. Verified: `IncludeAssembly(typeof(X).Assembly)` did not find handlers in the probe's entry assembly, and every invoke failed with `IndeterminateRoutesException`.
 
@@ -401,6 +401,8 @@ Every test gets a `business_value` trait that states what the test protects.
 
 ## Risks / verify during implementation
 
+- **Verified portability (2026-10-01):** copying the project into a service that does not use this repo's build props was tried for real, and it failed twice before working: (1) the csproj had no `TargetFramework` (it came from `Directory.Build.props`), so it didn't build outside this repo; the csproj now sets `TargetFramework`, `Nullable` and `ImplicitUsings` itself; (2) the public `ScenarioAssertionException` clashed with `Alba.ScenarioAssertionException` (CS0104) in any test file that imports both namespaces, which every Alba-based consumer does; it is now `HarnessAssertionException`. `scripts/check-portability.sh` (`just portability`, run in CI) repeats the copy into a throwaway directory with its own package versions and nuget.org only, and runs a separate sample service (`samples/ConsumerService`, an Order domain) against it. It fails with the old csproj (checked).
+- **Verified API reference completeness:** `ApiReferenceCoverageTests` fails the build if any public type, member or enum value of the harness is missing from `docs/reference/api.md` or `harness-options.md` (checked by adding an undocumented property and watching it fail). It checks presence, not that the description is right.
 - **Verified (2026-10-01):** every Marten 9.44, Wolverine 6.44 and Alba 8.5.3 API this design names was checked three ways: Context7 docs, reflection over the pinned assemblies, and a runtime probe on a `net10.0` Alba host against Postgres 17 (Testcontainers), run once without and once with `AddAsyncDaemon(Solo)`. Findings are written into the sections above. The probe lives outside the repo; the `tests` todo turns each finding into a real test so a package upgrade that changes the behaviour fails CI.
 - A future Wolverine or Marten release could change any of the behaviours in the classifier table (for example, start wrapping top-level handler exceptions, or start throwing for a wrong `TResponse`). The classifier tests are the guard.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
@@ -457,7 +459,7 @@ Writing rules, from the Diátaxis guidance for each kind:
 
 Keeping the docs accurate:
 
-- **XML doc comments (reference in the IDE):** every public type and member in `CritterStack.TestHarness` has a `<summary>`, and methods have `<param>`, `<returns>` and, where useful, `<example>` and `<exception>`. Stage methods state the stage they're valid on and the stage they return, and Thens state which `When` or `WhenQuery` they refer to, so IntelliSense carries the step-ordering rules. These comments are reference material, so they follow the reference rules above. `GenerateDocumentationFile` plus warnings as errors makes a missing comment fail the build. `docs/reference/api.md` describes the same behaviour, but it is written by hand, so nothing checks automatically that the two stay in step. Update both together.
+- **XML doc comments (reference in the IDE):** every public type and member in `CritterStack.TestHarness` has a `<summary>`, and methods have `<param>`, `<returns>` and, where useful, `<example>` and `<exception>`. Stage methods state the stage they're valid on and the stage they return, and Thens state which `When` or `WhenQuery` they refer to, so IntelliSense carries the step-ordering rules. These comments are reference material, so they follow the reference rules above. `GenerateDocumentationFile` plus warnings as errors makes a missing comment fail the build. `docs/reference/api.md` describes the same behaviour and is written by hand. `ApiReferenceCoverageTests` fails the build if a public member is missing from it, but nothing checks that the wording of the two agrees, so update both together.
 - **Samples that compile and pass:** every C# code block and example failure message in `docs/tutorials/` and `docs/how-to/` has a matching test in `src/CritterStack.TestHarness.Tests/DocSamples/`, and each block carries a `<!-- Test: ... -->` comment naming it. `just test` fails if a sample's test breaks, and `DocSampleSyncTests` fails if any line of a C# sample block is missing from the `DocSamples/` sources or a marker names a test that doesn't exist (verified by editing a sample and watching it fail). Plain-text blocks such as example failure messages aren't line-checked; their tests assert the message shape instead.
 - **This design doc** (`initial-design.md`) is the build plan, not user documentation. Once v1 ships, the parts worth keeping move into `docs/explanation/design-decisions.md`.
 
@@ -484,7 +486,7 @@ In build order. Each item lists what "done" means.
   - tenant-aware session and invoke helpers (one code path with and without a tenant);
   - projection sync (`CatchUp`, `WaitForNonStale`, `None`) with the dirty flag, `ProjectionTimeout`, and an internal hook that counts sync calls;
   - the exception classifier (handler exception vs infrastructure failure) and the unclaimed-exception rule (fail at the first non-`ThenThrows` `Then`, the next `When`/`WhenQuery`, or the end);
-  - `ScenarioAssertionException` and a failure-message formatter that writes step name, event versions, type names and JSON payloads with the store's serializer, and attaches `InnerException` when caused by an exception.
+  - `HarnessAssertionException` and a failure-message formatter that writes step name, event versions, type names and JSON payloads with the store's serializer, and attaches `InnerException` when caused by an exception.
 - [x] **steps:** Implement each step on top of `core`:
   - `GivenStreamStep` (start on first use of an id, append after);
   - `WhenCommandStep` (sync if dirty, snapshot versions, tracked invoke, capture handler exception, keep `ITrackedSession`);

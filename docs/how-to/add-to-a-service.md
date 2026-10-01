@@ -10,7 +10,7 @@ Copy `src/CritterStack.TestHarness/` into your repo and add a project reference 
 <ProjectReference Include="..\CritterStack.TestHarness\CritterStack.TestHarness.csproj" />
 ```
 
-The project has no build imports of its own. Its `Directory.Build.props` settings (CodeStandards, GitVersion) stay in this repo.
+Copy the `.cs` and `.csproj` files only, not `bin/` or `obj/`. The project sets its own target framework (`net10.0`), nullable and implicit usings, so it builds without this repo's `Directory.Build.props`; the analyzers and versioning in that file stay here. `scripts/check-portability.sh` (`just portability`) does exactly these steps in a throwaway directory and runs a sample service's scenarios, and CI runs it on every push.
 
 ## 2. Add package versions
 

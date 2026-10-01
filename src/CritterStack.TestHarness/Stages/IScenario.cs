@@ -19,7 +19,7 @@ public interface IScenario
     /// </summary>
     /// <param name="cancellationToken">Cancels the run between steps and inside Marten and Wolverine calls.</param>
     /// <returns>A task that completes when every step has passed.</returns>
-    /// <exception cref="ScenarioAssertionException">A step failed. The message names the step.</exception>
+    /// <exception cref="HarnessAssertionException">A step failed. The message names the step.</exception>
     Task RunAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

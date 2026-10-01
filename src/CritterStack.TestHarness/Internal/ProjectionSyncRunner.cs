@@ -23,7 +23,7 @@ internal static class ProjectionSyncRunner
     /// <param name="context">The scenario context.</param>
     /// <param name="cancellationToken">Cancels the sync.</param>
     /// <returns>A task that completes when projections are current.</returns>
-    /// <exception cref="ScenarioAssertionException">The sync failed or timed out.</exception>
+    /// <exception cref="HarnessAssertionException">The sync failed or timed out.</exception>
     internal static async Task SyncIfDirtyAsync(ScenarioContext context, CancellationToken cancellationToken)
     {
         if (!context.ProjectionsDirty)

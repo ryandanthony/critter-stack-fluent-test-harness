@@ -64,6 +64,10 @@ jobs:
       - name: Test
         run: just test
 
+      # Proves the portability rule: the harness project copied into a service with no repo build props.
+      - name: Portability check
+        run: just portability
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

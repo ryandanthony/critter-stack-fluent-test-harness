@@ -128,7 +128,7 @@ internal sealed class StreamAssertionStep : IScenarioStep
         return _hasPredicate ? $"{type} matching the predicate" : type;
     }
 
-    private static ScenarioAssertionException Fail(ScenarioContext context, string message, IReadOnlyList<IEvent> events) =>
+    private static HarnessAssertionException Fail(ScenarioContext context, string message, IReadOnlyList<IEvent> events) =>
         Failure.Create(
             context.CurrentStepLabel,
             $"{message}.{Environment.NewLine}Actual events:{Environment.NewLine}{PayloadFormatter.FormatEvents(context, events)}");

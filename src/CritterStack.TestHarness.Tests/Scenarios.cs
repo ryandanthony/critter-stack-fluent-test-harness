@@ -12,12 +12,12 @@ namespace CritterStack.TestHarness.Tests;
 internal static class Scenarios
 {
     /// <summary>
-    /// Runs a scenario and returns the <see cref="ScenarioAssertionException"/> it must throw.
+    /// Runs a scenario and returns the <see cref="HarnessAssertionException"/> it must throw.
     /// </summary>
     /// <param name="scenario">The scenario.</param>
     /// <returns>The failure.</returns>
-    internal static Task<ScenarioAssertionException> FailsAsync(IScenario scenario) =>
-        Assert.ThrowsAsync<ScenarioAssertionException>(() => scenario.RunAsync(TestContext.Current.CancellationToken));
+    internal static Task<HarnessAssertionException> FailsAsync(IScenario scenario) =>
+        Assert.ThrowsAsync<HarnessAssertionException>(() => scenario.RunAsync(TestContext.Current.CancellationToken));
 
     /// <summary>
     /// A string comparison that analyzers accept inside predicates.

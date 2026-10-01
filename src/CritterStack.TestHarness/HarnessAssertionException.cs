@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------
-// <copyright file="ScenarioAssertionException.cs" company="Ryan Anthony">
+// <copyright file="HarnessAssertionException.cs" company="Ryan Anthony">
 // Copyright (c) Ryan Anthony. All rights reserved.
 // </copyright>
 // -----------------------------------------------------------------------
@@ -11,30 +11,30 @@ namespace CritterStack.TestHarness;
 /// shows what was actually there. When the failure was caused by an exception, that exception is the
 /// <see cref="Exception.InnerException"/>.
 /// </summary>
-public sealed class ScenarioAssertionException : Exception
+public sealed class HarnessAssertionException : Exception
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="ScenarioAssertionException"/> class.
+    /// Initializes a new instance of the <see cref="HarnessAssertionException"/> class.
     /// </summary>
-    public ScenarioAssertionException()
+    public HarnessAssertionException()
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ScenarioAssertionException"/> class.
+    /// Initializes a new instance of the <see cref="HarnessAssertionException"/> class.
     /// </summary>
     /// <param name="message">The failure message.</param>
-    public ScenarioAssertionException(string message)
+    public HarnessAssertionException(string message)
         : base(message)
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ScenarioAssertionException"/> class.
+    /// Initializes a new instance of the <see cref="HarnessAssertionException"/> class.
     /// </summary>
     /// <param name="message">The failure message.</param>
     /// <param name="innerException">The exception that caused the failure.</param>
-    public ScenarioAssertionException(string message, Exception? innerException)
+    public HarnessAssertionException(string message, Exception? innerException)
         : base(message, innerException)
     {
     }

@@ -1,6 +1,6 @@
 # Failure messages
 
-Every failure is a `ScenarioAssertionException` whose message starts with the step that failed:
+Every failure is a `HarnessAssertionException` whose message starts with the step that failed:
 
 ```
 step 4 ThenAppended<WidgetRenamed>(3f0c…): no WidgetRenamed matching the predicate appended by step 3 When(RenameWidget).

@@ -17,3 +17,7 @@ build: restore
 # Run all tests in Release mode (requires Docker for Testcontainers).
 test: build
   dotnet test --solution {{solution}} --no-build --configuration Release --report-xunit-trx --results-directory TestResults
+
+# Copy the harness into a throwaway service (no repo build props) and run that service's scenarios (requires Docker).
+portability:
+  ./scripts/check-portability.sh

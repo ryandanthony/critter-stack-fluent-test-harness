@@ -53,7 +53,7 @@ public sealed class FirstScenarioSamples(WidgetServiceFixture fixture) : IClassF
     {
         var widgetId = Guid.NewGuid();
 
-        var failure = await Assert.ThrowsAsync<ScenarioAssertionException>(() => TestHarness
+        var failure = await Assert.ThrowsAsync<HarnessAssertionException>(() => TestHarness
             .Setup(fixture.Host)
             .GivenStream<Widget>(widgetId, id => [new WidgetCreated(id, "Sprocket")])
             .When(() => new RenameWidget(widgetId, "Gear"))

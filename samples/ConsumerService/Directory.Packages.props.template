@@ -1,0 +1,16 @@
+<Project>
+  <!-- The consuming service's own central package versions (step 2 of the add-to-a-service how-to). -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Alba" Version="8.5.3" />
+    <PackageVersion Include="Marten" Version="9.44.0" />
+    <PackageVersion Include="WolverineFx" Version="6.44.0" />
+    <PackageVersion Include="WolverineFx.Marten" Version="6.44.0" />
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.44.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+  </ItemGroup>
+</Project>
