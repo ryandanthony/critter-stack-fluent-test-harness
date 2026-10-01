@@ -86,10 +86,11 @@ flowchart LR
     - `WaitForNonStale`: calls `WaitForNonStaleProjectionDataAsync`, for hosts that already run the daemon.
     - `None`: for services with only inline projections.
   - `ProjectionTimeout`
-  - `DocumentStore`: a `Func<IServiceProvider, IDocumentStore>` that defaults to the main `IDocumentStore`. Use it for services that use an ancillary store (`IDocumentStore` subtypes).
   - `TrackingTimeout`
   - `IncludeExternalMessages` (Wolverine tracking)
-- **Stream identity:** overloads for both `Guid` and `string` stream ids, which covers Marten's two `StreamIdentity` modes. Both have plain and `<TAggregate>` forms.
+- **v1 scope: main store, Guid stream ids.** The harness always uses the host's main `IDocumentStore` and supports only `StreamIdentity.AsGuid`. Stream methods take a `Guid` id and come in plain and `<TAggregate>` forms. Not in v1:
+  - **String stream ids** (`StreamIdentity.AsString`): would add `string` overloads of every stream method, plus a test host configured for string ids.
+  - **Ancillary stores** (`IDocumentStore` subtypes): would need a generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the host sync methods.
 - **Multi-tenancy:** one tenant per scenario. `Setup` returns `IScenarioStart`, which adds `ForTenant(tenantId)` on top of `IGivenStage`. `ForTenant` returns a plain `IGivenStage`, so it can only be called once, straight after `Setup` and before any Given. If it isn't called, the scenario uses Marten's default tenant. When a tenant is set, every step uses it:
   - Givens and all Then reads open sessions with `LightweightSession(tenantId)`;
   - `When` runs `host.ExecuteAndWaitAsync(c => c.InvokeForTenantAsync(tenantId, command))` under tracking;
@@ -174,9 +175,7 @@ public interface IScenarioStart : IGivenStage
 public interface IGivenStage
 {
     IGivenStage GivenStream(Guid id, Func<Guid, object[]> events);
-    IGivenStage GivenStream(string id, Func<string, object[]> events);
     IGivenStage GivenStream<TAggregate>(Guid id, Func<Guid, object[]> events) where TAggregate : class;
-    IGivenStage GivenStream<TAggregate>(string id, Func<string, object[]> events) where TAggregate : class;
 
     ICommandStage When(Func<object> command);
     IQueryStage<TResponse> WhenQuery<TResponse>(Func<object> query);
@@ -187,11 +186,8 @@ public interface IThenStage<out TSelf> : IScenario
     where TSelf : IThenStage<TSelf>
 {
     TSelf ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
-    TSelf ThenStreamHasEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null);
     TSelf ThenStreamHasNoEvent<TEvent>(Guid id);
-    TSelf ThenStreamHasNoEvent<TEvent>(string id);
     TSelf ThenStreamEventCount(Guid id, int expected);
-    TSelf ThenStreamEventCount(string id, int expected);
 
     TSelf ThenThrows<TException>(Func<TException, bool>? predicate = null) where TException : Exception;
 
@@ -203,11 +199,8 @@ public interface IThenStage<out TSelf> : IScenario
 public interface ICommandStage : IThenStage<ICommandStage>
 {
     ICommandStage ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
-    ICommandStage ThenAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null);
     ICommandStage ThenNotAppended<TEvent>(Guid id);
-    ICommandStage ThenNotAppended<TEvent>(string id);
     ICommandStage ThenAppendedCount(Guid id, int expected);
-    ICommandStage ThenAppendedCount(string id, int expected);
 
     ICommandStage ThenPublished<TMessage>(Func<TMessage, bool>? predicate = null);
 }
@@ -275,7 +268,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 - `Infrastructure/HarnessHostFixture.cs`: starts a Postgres Testcontainer, then `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. The event store uses conjoined tenancy (`Events.TenancyStyle = TenancyStyle.Conjoined`) and Wolverine's Marten integration routes invokes by tenant id, so `ForTenant` can be tested; scenarios without `ForTenant` run on the default tenant. It registers no daemon, so `CatchUp` is proven against a host that has none. A second fixture variant with `AddAsyncDaemon(Solo)` covers `WaitForNonStale`.
 - `Infrastructure/HarnessCollection.cs`: an xUnit collection fixture.
 - `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
-  - a Given creates the stream, for both `Guid` and `string` ids;
+  - a Given creates the stream, in both its plain and `<TAggregate>` forms;
   - `ForTenant("a")` Givens, `When` and `ThenAppended` all run as tenant `a`, and the command handler's session sees tenant `a`;
   - a stream given under tenant `a` is not visible to a scenario that uses `ForTenant("b")` (`ThenStreamEventCount(id, 0)`);
   - `WhenQuery` under `ForTenant` returns that tenant's read model;
