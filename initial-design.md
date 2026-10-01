@@ -60,8 +60,11 @@ flowchart LR
 - **Portability rule:** the harness depends only on the Alba, Marten and Wolverine abstractions. It has no knowledge of any service's aggregates, projections, schemas, fixtures or transports, so you can copy the project into another service and use it unchanged. Everything that varies between services is set through `HarnessOptions`.
 - **Setup:** `TestHarness.Setup(IHost host, Action<HarnessOptions>? configure)`. `IAlbaHost` is an `IHost`, so any service's existing Alba fixture works. The harness never builds or owns a host; the caller's fixture owns the host, containers and lifetime. Options:
   - `ProjectionSync`, one of:
-    - `CatchUp` (default): calls `ForceAllMartenDaemonActivityToCatchUpAsync`, which works whether or not the host runs an async daemon.
-    - `WaitForNonStale`: calls `WaitForNonStaleProjectionDataAsync`, for hosts that already run the daemon.
+    - `CatchUp` (default): forces every async projection to catch up, whether or not the host runs a daemon. `ForceAllMartenDaemonActivityToCatchUpAsync` alone can't do this, because it needs the daemon's `IProjectionCoordinator` and throws `InvalidOperationException` on a host without one (verified). So the harness picks a path at run time:
+      - host has an `IProjectionCoordinator` (it runs `AddAsyncDaemon`): `host.ForceAllMartenDaemonActivityToCatchUpAsync(ct)`. It returns `IReadOnlyList<Exception>`; a non-empty list is a projection failure and fails the scenario as an infrastructure failure.
+      - host has none: `store.BuildProjectionDaemonAsync()`, then `daemon.CatchUpAsync(ProjectionTimeout, ct)`, then dispose the daemon.
+      - Both paths were verified against Marten 9.44. The second path must never run on a host that has a daemon: it fails with `ProgressionProgressOutOfOrderException` because two daemons fight over the same projection progress.
+    - `WaitForNonStale`: calls `host.WaitForNonStaleProjectionDataAsync(ProjectionTimeout)`, for hosts that already run the daemon. On a host with no daemon it always times out (`TimeoutException`), so it is only valid with a daemon (verified).
     - `None`: for services with only inline projections.
   - `ProjectionTimeout`
   - `TrackingTimeout`
@@ -70,10 +73,12 @@ flowchart LR
   - **String stream ids** (`StreamIdentity.AsString`): would add `string` overloads of every stream method, plus a test host configured for string ids.
   - **Ancillary stores** (`IDocumentStore` subtypes): would need a generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the host sync methods.
 - **Multi-tenancy:** one tenant per scenario. `Setup` returns `IScenarioStart`, which adds `ForTenant(tenantId)` on top of `IGivenStage`. `ForTenant` returns a plain `IGivenStage`, so it can only be called once, straight after `Setup` and before any Given. If it isn't called, the scenario uses Marten's default tenant. When a tenant is set, every step uses it:
-  - Givens and all Then reads open sessions with `LightweightSession(tenantId)`;
-  - `When` runs `host.ExecuteAndWaitAsync(c => c.InvokeForTenantAsync(tenantId, command))` under tracking;
+  - Givens and all Then reads open sessions with `store.LightweightSession(tenantId)`;
+  - `When` runs `host.TrackActivity().Timeout(TrackingTimeout)[.IncludeExternalTransports()].ExecuteAndWaitAsync(c => c.InvokeForTenantAsync(tenantId, command))`;
   - `WhenQuery` runs `bus.InvokeForTenantAsync<TResponse>(tenantId, query)`.
-  - Without a tenant, `When` runs `host.ExecuteAndWaitAsync(c => c.InvokeAsync(command))` and `WhenQuery` runs `bus.InvokeAsync<TResponse>(query)`. Both paths share one code path that only differs in the invoke call.
+  - Without a tenant, `When` uses `c.InvokeAsync(command)` and `WhenQuery` uses `bus.InvokeAsync<TResponse>(query)`. Both paths share one code path that only differs in the invoke call.
+  - Verified: the handler's `IDocumentSession.TenantId` is the scenario's tenant under `InvokeForTenantAsync`, and `*DEFAULT*` (Marten's default tenant id) without one. A stream written for tenant `a` is invisible to tenant `b` (`FetchStreamAsync` returns no events, `FetchStreamStateAsync` returns `null`).
+  - `ExecuteAndWaitAsync` has both `Func<IMessageContext, Task>` and `Func<IMessageContext, ValueTask>` overloads, so an `async` lambda is ambiguous (CS0121). Cast it to `Func<IMessageContext, Task>`.
 - **Givens:**
   - `GivenStream(Guid id, Func<Guid, object[]> events)` and `GivenStream<TAggregate>(...)` write events to a stream. The scenario remembers which stream ids its Givens have already started:
     - the first `GivenStream` for an id calls `session.Events.StartStream` (`StartStream<TAggregate>` for the generic form);
@@ -86,7 +91,7 @@ flowchart LR
   - There is no sync after the last step or before a `Then`. Stream assertions read events directly, and `ThenPublished` reads the tracked session, so neither needs projections. To assert on a read model after a `When`, follow it with a `WhenQuery`, which syncs first.
   - A sync that exceeds `ProjectionTimeout` is an infrastructure failure (see **Captured exceptions**).
 - **When:**
-  - `When(Func<object> command)` runs projection sync if needed, then invokes the command under Wolverine tracking with `host.ExecuteAndWaitAsync(...)` (tenant-aware, see **Multi-tenancy**). It keeps the `ITrackedSession` for `ThenPublished`.
+  - `When(Func<object> command)` runs projection sync if needed, then invokes the command under Wolverine tracking with `TrackActivity()...ExecuteAndWaitAsync(...)` (tenant-aware, see **Multi-tenancy**). It keeps the `ITrackedSession` for `ThenPublished`.
   - If the command throws, the harness captures the exception for `ThenThrows<T>` instead of failing straight away.
 - **Captured exceptions (When and WhenQuery alike):**
   - Both `When` and `WhenQuery` capture an exception thrown by the *handler* instead of failing straight away.
@@ -94,9 +99,25 @@ flowchart LR
     - `WhenQuery<TResponse>` where the handler's response isn't a `TResponse`;
     - a Wolverine tracking timeout on `When` (`TrackingTimeout` exceeded);
     - no handler registered for the command or query;
-    - projection sync timing out (`ProjectionTimeout` exceeded).
-  - The runner tells the two apart by where the exception comes from: anything thrown out of the handler pipeline (including an `AggregateException` from tracking that wraps handler exceptions) is captured. The specific Wolverine and Marten exception types for the four infrastructure cases above are confirmed during the `verify-apis` step and listed in one internal classifier.
-  - `ThenThrows<T>` checks the most recent captured exception. Its type has to match `T` (including subclasses), or an `AggregateException` from tracking has to wrap one, and the optional predicate has to pass.
+    - projection sync failing or timing out (`ProjectionTimeout` exceeded);
+    - a Given whose stream id already exists in the database.
+  - **How each case actually surfaces** (verified against Marten 9.44 / Wolverine 6.44 on a real host, with and without a daemon). One internal classifier holds this table:
+
+    | Case | What Wolverine/Marten does | Harness treats it as |
+    |---|---|---|
+    | Handler throws, `When` | the handler's own exception, rethrown as-is (e.g. `WidgetException`), not wrapped | captured, claimable |
+    | Cascaded handler throws, `When` | `AggregateException` whose `InnerExceptions` are the handler exceptions | captured, claimable (unwrapped, see `ThenThrows`) |
+    | Handler throws, `WhenQuery` | the handler's own exception, as-is | captured, claimable |
+    | Tracking timeout | `System.TimeoutException` ("This TrackedSession timed out before all activity completed"), with an inner `TimeoutException`; thrown even with `DoNotAssertOnTimeout()` | infrastructure, fails at once |
+    | No handler | `Wolverine.Runtime.Routing.IndeterminateRoutesException`, from both tracked and untracked invokes | infrastructure, fails at once |
+    | Wrong `TResponse` | **no exception.** Wolverine returns `default(TResponse)` (`null`, or `0` for value types) | see below |
+    | `CatchUp` path error | `ForceAll…` returns a non-empty `IReadOnlyList<Exception>`; `BuildProjectionDaemonAsync` path throws | infrastructure, fails at once |
+    | `WaitForNonStale` timeout | `System.TimeoutException` | infrastructure, fails at once |
+    | Given stream collision | `Marten.Exceptions.ExistingStreamIdCollisionException` from `SaveChangesAsync` | infrastructure, fails at once |
+
+  - **Classification rule:** because a handler exception can be *any* type (including `TimeoutException`), the classifier goes by *where* the exception came from, not only its type: exceptions from projection sync and from Givens are always infrastructure; from a `When` or `WhenQuery`, `IndeterminateRoutesException` and the tracked session's own `TimeoutException` (identified by its message and inner `TimeoutException`, since a handler's `TimeoutException` has neither) are infrastructure, and everything else is a handler exception.
+  - **Wrong `TResponse` can't be detected from the exception, because there isn't one.** How the harness should report it is an open decision (see **Open decisions**).
+  - `ThenThrows<T>` checks the most recent captured exception. Its type has to match `T` (including subclasses), or, if it is an `AggregateException` from a cascade, one of its `InnerExceptions` has to; the optional predicate runs against that matching exception.
   - An unclaimed exception fails the scenario at the first point where it could hide the real cause: the first `Then` after the throwing step that isn't a `ThenThrows`, or the next `When`/`WhenQuery`, or the end of the scenario, whichever comes first. That step doesn't run its own check. It reports "`<step>` threw `<type>`" with the original exception attached as `InnerException`. So when you expect an exception, put `ThenThrows` first:
     ```csharp
     .When(() => new FailWidget(id))
@@ -117,7 +138,8 @@ flowchart LR
     - `ThenStreamEventCount(id, n)`
   - `ThenThrows<TException>(predicate?)`, valid after a `When` or a `WhenQuery`.
   - `ThenPublished<TMessage>(predicate?)`, which reads from the tracked session and is valid only after a `When`.
-- **How "appended" is measured:** because execution is deferred, the runner knows every stream id that an appended-event assertion uses before the `When` runs. Right before invoking the command, the `When` step reads `FetchStreamStateAsync` for each of those ids and stores the version (0 if the stream doesn't exist yet). The appended-event assertions then fetch the stream and look only at events with a version above that snapshot. Streams that no appended-event assertion mentions are never snapshotted.
+- **How "appended" is measured:** because execution is deferred, the runner knows every stream id that an appended-event assertion uses before the `When` runs. Right before invoking the command, the `When` step reads `FetchStreamStateAsync` for each of those ids and stores the version (0 when it returns `null`, which it does for a stream that doesn't exist yet, verified). The appended-event assertions then call `FetchStreamAsync(id, fromVersion: snapshot + 1)`, which returns only the newer events (verified: after a rename, `fromVersion: 2` returns just `2:widget_renamed`). Streams that no appended-event assertion mentions are never snapshotted.
+- **`ThenPublished` reads `ITrackedSession.Sent`.** Verified for a handler that returns a cascading message: `Sent` holds only the cascaded message, while `Executed` holds both the command and the cascaded message. So `ThenPublished<T>` matches against `tracked.Sent.MessagesOf<T>()`, and its failure message lists `tracked.Sent.AllMessages()`.
 - **Step ordering:** the stage interfaces below enforce the order at compile time.
   - `When` is optional. A scenario can go straight from the Givens to `WhenQuery`, as in `Setup → GivenStream... → WhenQuery → ThenResult`, or even from `Setup` to `WhenQuery` with no Givens.
   - Givens are allowed only before the first `When` or `WhenQuery`.
@@ -249,13 +271,14 @@ Repo scaffolding:
   | WolverineFx.Marten | 6.44.0 |
   | Alba | 8.5.3 |
   | Testcontainers.PostgreSql | 4.15.0 |
+  | WolverineFx.RuntimeCompilation | 6.44.0 |
   | xunit.v3 (needed for assembly fixtures) | 4.0.1 |
   | xunit.runner.visualstudio | 4.0.0 |
   | Microsoft.NET.Test.Sdk | 18.10.1 |
   | GitVersion.MsBuild | 6.8.2 |
   | FestinaLente.CodeStandards | 1.1.10 |
 
-  All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies.
+  All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies. `WolverineFx.RuntimeCompilation` is needed because WolverineFx 6.44 no longer ships the runtime (Roslyn) compiler: a host in the default `TypeLoadMode.Dynamic` fails to start without it (verified). The test project references it; the harness library doesn't need it.
 - `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` and `FestinaLente.CodeStandards` (both `PrivateAssets="all"`) on every project, `stylecop.json` added as an `AdditionalFiles` item, and xunit v3 and the test SDK added to every `*.Tests` project. `GenerateDocumentationFile` is on for non-test projects, so with warnings as errors a missing XML doc comment on any public member (CS1591) fails the build.
 - `src/Directory.Build.targets`: copied verbatim from awen. It removes the `stylecop.json` that ships inside the CodeStandards package so only the repo's copy is used. This has to be a `.targets` file, because NuGet package props are imported after `Directory.Build.props`:
 
@@ -351,18 +374,28 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - `ThenStreamHasNoEvent<WidgetRenamed>(id, e => e.Name == "Gear")` passes when the stream only has a rename to another name, and fails when it has a rename to `"Gear"`; the same for `ThenNotAppended`;
   - `ThenResult` after a query that threw fails with a clear message;
   - `ThenThrows` when nothing was thrown fails;
-  - `WhenQuery<TResponse>` with the wrong response type surfaces as a `ScenarioAssertionException` that names the step and keeps Wolverine's exception as `InnerException`;
+  - `WhenQuery<TResponse>` with the wrong response type is reported as described in **Open decisions** (Wolverine itself throws nothing and returns `default`);
+  - a cascaded handler that throws surfaces as an `AggregateException` and `ThenThrows<WidgetException>()` still claims it;
+  - a `When` command whose handler throws a `TimeoutException` of its own is claimable, while the tracked session's timeout is not;
+  - `CatchUp` takes the `ForceAll…` path on the daemon host and the `BuildProjectionDaemonAsync` path on the no-daemon host, and both leave `WidgetSummary` current;
+  - a Given that reuses an existing stream id fails at once with `ExistingStreamIdCollisionException` as `InnerException`;
   - an unclaimed handler exception's `ScenarioAssertionException` has the original handler exception as `InnerException`.
-- Package needs: Alba, Marten, WolverineFx, WolverineFx.Marten and Testcontainers.PostgreSql, all pinned in `src/Directory.Packages.props`. xunit v3 comes from `src/Directory.Build.props` for `*.Tests`.
+- Package needs: Alba, Marten, WolverineFx, WolverineFx.Marten, WolverineFx.RuntimeCompilation and Testcontainers.PostgreSql, all pinned in `src/Directory.Packages.props`. xunit v3 comes from `src/Directory.Build.props` for `*.Tests`.
+- Both host fixtures register handlers with `opts.Discovery.IncludeType(...)` for each `TestDomain` handler class. Verified: `IncludeAssembly(typeof(X).Assembly)` did not find handlers in the probe's entry assembly, and every invoke failed with `IndeterminateRoutesException`.
 
 Every test gets a `business_value` trait that states what the test protects.
 
 ## Risks / verify during implementation
 
-- I will confirm these Marten 9.44 and Wolverine 6.44 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
+- **Verified (2026-10-01):** every Marten 9.44, Wolverine 6.44 and Alba 8.5.3 API this design names was checked three ways: Context7 docs, reflection over the pinned assemblies, and a runtime probe on a `net10.0` Alba host against Postgres 17 (Testcontainers), run once without and once with `AddAsyncDaemon(Solo)`. Findings are written into the sections above. The probe lives outside the repo; the `tests` todo turns each finding into a real test so a package upgrade that changes the behaviour fails CI.
+- A future Wolverine or Marten release could change any of the behaviours in the classifier table (for example, start wrapping top-level handler exceptions, or start throwing for a wrong `TResponse`). The classifier tests are the guard.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
 - `FestinaLente.CodeStandards` brings in analyzers (StyleCop and others) that, with warnings as errors, may flag code the design takes for granted, such as one public interface per file, file headers and member ordering. The first build after `scaffold` shows how strict it is. Fix the code to comply, and only suppress a rule in `.editorconfig` with a one-line reason.
 - Restore fails without a GitHub token for the `github` source, both locally and in CI.
+
+## Open decisions
+
+- **Wrong `TResponse` on `WhenQuery`.** Verified: `bus.InvokeAsync<TResponse>` (and `InvokeForTenantAsync<TResponse>`) do **not** throw when the handler returns a different type; they return `default(TResponse)`. The design assumed an exception. Until this is decided, `WhenQuery` treats the result as-is, so `ThenResult` sees `null`.
 
 ## Documentation
 
@@ -422,16 +455,17 @@ Keeping the docs accurate:
 
 In build order. Each item lists what "done" means.
 
-- [ ] **verify-apis:** Use Context7 to confirm, for the pinned Marten 9.44 and Wolverine 6.44 versions:
+- [x] **verify-apis:** Use Context7 to confirm, for the pinned Marten 9.44 and Wolverine 6.44 versions:
   - Marten: `ForceAllMartenDaemonActivityToCatchUpAsync`, `WaitForNonStaleProjectionDataAsync`, `FetchStreamAsync`, `FetchStreamStateAsync`, `StartStream`/`Append`, conjoined event tenancy, and `Options.Serializer()`;
   - Wolverine: `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on `IMessageContext` and `IMessageBus`), the `ITrackedSession` shape (for `ThenPublished`), tracking options for `TrackingTimeout` and `IncludeExternalMessages`, and `MessageStorageSchemaName` on `IntegrateWithWolverine`;
   - the exception types for each infrastructure failure (wrong `TResponse`, tracking timeout, no handler, sync timeout, stream id collision) and how a handler exception surfaces from tracking (direct or wrapped in `AggregateException`);
   - Alba 8.5.3 works with Wolverine 6.44 tracking on a `net10.0` host.
   - Update the design (pinned versions, API names, the **Risks** section) wherever something differs.
+  - Done 2026-10-01 via Context7, reflection and a runtime probe (see **Risks**). It changed the design in six places: the two-path `CatchUp`, the classifier table, the `WolverineFx.RuntimeCompilation` package, the `ExecuteAndWaitAsync` lambda cast, `IncludeType` handler discovery, and `ThenPublished` reading `Sent`. One open decision remains (wrong `TResponse`).
 - [ ] **scaffold:** Add `global.json` (.NET 10 SDK), `nuget.config` (nuget.org plus the festina-lente-io GitHub feed, with source mapping), `src/Directory.Packages.props` (the pinned versions in **Files**), `src/Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings as errors, CodeStandards, xunit v3 and the test SDK for `*.Tests`), `src/Directory.Build.targets` and `src/stylecop.json` (both from awen), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `FestinaLente.CodeStandards` restores from the GitHub feed, and `just build` succeeds on an empty solution.
 - [ ] **project:** Create both projects and add them to the slnx:
   - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
-  - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten and Testcontainers.PostgreSql).
+  - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten, WolverineFx.RuntimeCompilation and Testcontainers.PostgreSql).
 - [ ] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`, each with full XML doc comments (see **Documentation**). The Target API sample compiles, a misordered chain doesn't, and the build has no CS1591 warnings.
 - [ ] **core:** Implement the internal plumbing:
   - `ScenarioBuilder` (records steps, holds the tenant id, implements `IScenarioStart`, `IGivenStage` and `ICommandStage`) and `QueryStage<TResponse>` (forwards to the builder);
