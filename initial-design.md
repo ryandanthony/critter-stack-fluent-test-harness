@@ -224,8 +224,22 @@ This is a standalone repo. The harness library lives in `src/CritterStack.TestHa
 Repo scaffolding:
 
 - `src/CritterStack.TestHarness.slnx`: solution file containing the harness and its test project.
-- `src/Directory.Packages.props`: central package versions for Alba, Marten 9.23, WolverineFx 6.26, WolverineFx.Marten, Testcontainers.PostgreSql and xunit v3 (`xunit.v3`, needed for assembly fixtures).
-- `src/Directory.Build.props`: shared build settings, and adds xunit v3 and the test SDK to every `*.Tests` project.
+- `global.json` (repo root): pins the .NET 10 SDK (`10.0.302`, `rollForward: latestFeature`).
+- `src/Directory.Packages.props`: central package versions, pinned to the latest stable releases (as of 2026-10-01):
+
+  | Package | Version |
+  |---|---|
+  | Marten | 9.44.0 |
+  | WolverineFx | 6.44.0 |
+  | WolverineFx.Marten | 6.44.0 |
+  | Alba | 8.5.3 |
+  | Testcontainers.PostgreSql | 4.15.0 |
+  | xunit.v3 (needed for assembly fixtures) | 4.0.1 |
+  | xunit.runner.visualstudio | 4.0.0 |
+  | Microsoft.NET.Test.Sdk | 18.10.1 |
+
+  All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies.
+- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, and xunit v3 and the test SDK added to every `*.Tests` project.
 - `justfile` (repo root): `build` and `test` recipes over the slnx.
 
 Harness library:
@@ -294,20 +308,20 @@ Every test gets a `business_value` trait that states what the test protects.
 
 ## Risks / verify during implementation
 
-- I will confirm these Marten 9.23 and Wolverine 6.26 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
+- I will confirm these Marten 9.44 and Wolverine 6.44 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
 
 ## Todos
 
 In build order. Each item lists what "done" means.
 
-- [ ] **verify-apis:** Use Context7 to confirm, for the pinned Marten 9 and Wolverine 6 versions:
+- [ ] **verify-apis:** Use Context7 to confirm, for the pinned Marten 9.44 and Wolverine 6.44 versions:
   - Marten: `ForceAllMartenDaemonActivityToCatchUpAsync`, `WaitForNonStaleProjectionDataAsync`, `FetchStreamAsync`, `FetchStreamStateAsync`, `StartStream`/`Append`, conjoined event tenancy, and `Options.Serializer()`;
   - Wolverine: `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on `IMessageContext` and `IMessageBus`), the `ITrackedSession` shape (for `ThenPublished`), tracking options for `TrackingTimeout` and `IncludeExternalMessages`, and `MessageStorageSchemaName` on `IntegrateWithWolverine`;
   - the exception types for each infrastructure failure (wrong `TResponse`, tracking timeout, no handler, sync timeout, stream id collision) and how a handler exception surfaces from tracking (direct or wrapped in `AggregateException`);
-  - Alba's version is compatible with Wolverine 6.
+  - Alba 8.5.3 works with Wolverine 6.44 tracking on a `net10.0` host.
   - Update the design (pinned versions, API names, the **Risks** section) wherever something differs.
-- [ ] **scaffold:** Add `src/Directory.Packages.props` (pinned versions), `src/Directory.Build.props` (target framework, nullable, implicit usings, xunit v3 and the test SDK for `*.Tests`), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `just build` succeeds on an empty solution.
+- [ ] **scaffold:** Add `global.json` (.NET 10 SDK), `src/Directory.Packages.props` (the pinned versions in **Files**), `src/Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings as errors, xunit v3 and the test SDK for `*.Tests`), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `just build` succeeds on an empty solution.
 - [ ] **project:** Create both projects and add them to the slnx:
   - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
   - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten and Testcontainers.PostgreSql).
