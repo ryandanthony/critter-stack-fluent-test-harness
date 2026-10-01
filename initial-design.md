@@ -108,14 +108,15 @@ flowchart LR
     | Handler throws, `When` | the handler's own exception, rethrown as-is (e.g. `WidgetException`), not wrapped | captured, claimable |
     | Cascaded handler throws, `When` | `AggregateException` whose `InnerExceptions` are the handler exceptions | captured, claimable (unwrapped, see `ThenThrows`) |
     | Handler throws, `WhenQuery` | the handler's own exception, as-is | captured, claimable |
-    | Tracking timeout | `System.TimeoutException` ("This TrackedSession timed out before all activity completed"), with an inner `TimeoutException`; thrown even with `DoNotAssertOnTimeout()` | infrastructure, fails at once |
+    | Tracking timeout | `System.TimeoutException` ("This TrackedSession timed out before all activity completed"), with an inner `TimeoutException` ("The operation has timed out."); thrown even with `DoNotAssertOnTimeout()` | infrastructure, fails at once |
+    | Handler throws its own `TimeoutException`, `When` | **the same wrapper** as a tracking timeout ("This TrackedSession timed out…"), with the handler's `TimeoutException` as the inner exception, thrown immediately (found while building the tests) | handler exception: unwrapped to the inner exception, claimable |
     | No handler | `Wolverine.Runtime.Routing.IndeterminateRoutesException`, from both tracked and untracked invokes | infrastructure, fails at once |
     | Wrong `TResponse` | **no exception.** Wolverine returns `default(TResponse)` (`null`, or `0` for value types) | the harness checks the type itself (see below); a mismatch is infrastructure, fails at once |
     | `CatchUp` path error | `ForceAll…` returns a non-empty `IReadOnlyList<Exception>`; `BuildProjectionDaemonAsync` path throws | infrastructure, fails at once |
     | `WaitForNonStale` timeout | `System.TimeoutException` | infrastructure, fails at once |
     | Given stream collision | `Marten.Exceptions.ExistingStreamIdCollisionException` from `SaveChangesAsync` | infrastructure, fails at once |
 
-  - **Classification rule:** because a handler exception can be *any* type (including `TimeoutException`), the classifier goes by *where* the exception came from, not only its type: exceptions from projection sync and from Givens are always infrastructure; from a `When` or `WhenQuery`, `IndeterminateRoutesException` and the tracked session's own `TimeoutException` (identified by its message and inner `TimeoutException`, since a handler's `TimeoutException` has neither) are infrastructure, and everything else is a handler exception.
+  - **Classification rule:** because a handler exception can be *any* type (including `TimeoutException`), the classifier goes by *where* the exception came from, not only its type: exceptions from projection sync and from Givens are always infrastructure; from a `When` or `WhenQuery`, `IndeterminateRoutesException` is infrastructure, and so is the tracked-session timeout wrapper **only if** the `When` ran for at least 90% of `TrackingTimeout`. Wolverine uses the identical wrapper for a handler's own `TimeoutException`, so elapsed time is the only reliable signal; a wrapper that arrives early is unwrapped and captured as the handler's exception. Everything else is a handler exception.
   - **Wrong `TResponse` is detected by the harness, not by Wolverine.** `WhenQuery<TResponse>` invokes with `InvokeAsync<object>` / `InvokeForTenantAsync<object>`, which returns the handler's real response object (verified), then checks it:
     - a non-null result that isn't a `TResponse` fails at once: "`WhenQuery<TResponse>` expected `<TResponse>`, handler returned `<actual type>`";
     - a `null` result is passed through as `default(TResponse)`. A query handler may legitimately return `null`, and Wolverine also gives `null` for a handler with no return value; the two can't be told apart, so `ThenResult`'s predicate receives `null` and decides.
@@ -465,8 +466,8 @@ In build order. Each item lists what "done" means.
 - [x] **project:** Create both projects and add them to the slnx:
   - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
   - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten, WolverineFx.RuntimeCompilation and Testcontainers.PostgreSql).
-- [ ] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`, each with full XML doc comments (see **Documentation**). The Target API sample compiles, a misordered chain doesn't, and the build has no CS1591 warnings.
-- [ ] **core:** Implement the internal plumbing:
+- [x] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`, each with full XML doc comments (see **Documentation**). The Target API sample compiles, a misordered chain doesn't, and the build has no CS1591 warnings.
+- [x] **core:** Implement the internal plumbing:
   - `ScenarioBuilder` (records steps, holds the tenant id, implements `IScenarioStart`, `IGivenStage` and `ICommandStage`) and `QueryStage<TResponse>` (forwards to the builder);
   - `IScenarioStep` and `ScenarioRunner`: runs steps in order on `RunAsync`/`GetAwaiter`, honours the `CancellationToken`, and pre-scans the steps to find which stream ids each `When` must snapshot;
   - `ScenarioContext`: host, tenant, tracked session, pending/claimed exception, last query result, stream-version snapshots, the started-stream set and the projection-sync "dirty" flag;
@@ -474,16 +475,16 @@ In build order. Each item lists what "done" means.
   - projection sync (`CatchUp`, `WaitForNonStale`, `None`) with the dirty flag, `ProjectionTimeout`, and an internal hook that counts sync calls;
   - the exception classifier (handler exception vs infrastructure failure) and the unclaimed-exception rule (fail at the first non-`ThenThrows` `Then`, the next `When`/`WhenQuery`, or the end);
   - `ScenarioAssertionException` and a failure-message formatter that writes step name, event versions, type names and JSON payloads with the store's serializer, and attaches `InnerException` when caused by an exception.
-- [ ] **steps:** Implement each step on top of `core`:
+- [x] **steps:** Implement each step on top of `core`:
   - `GivenStreamStep` (start on first use of an id, append after);
   - `WhenCommandStep` (sync if dirty, snapshot versions, tracked invoke, capture handler exception, keep `ITrackedSession`);
   - `WhenQueryStep` (sync if dirty, invoke as `object`, capture handler exception, fail at once on a non-null result that isn't `TResponse`, store typed result);
   - `StreamAssertionStep` (has / has-no with predicate / count, whole stream);
   - `AppendedAssertionStep` (appended / not-appended with predicate / count, since the snapshot);
   - `ThrowsAssertionStep`, `PublishedAssertionStep` and `ResultAssertionStep`.
-- [ ] **test-domain:** Build `TestDomain/`: the `Widget` aggregate, its events, the `RenameWidget`, `PublishWidget`, `FailWidget`, `StallWidget` and `ArchiveWidget` commands and handlers, the `GetWidgetById` query and handler, and the `WidgetDetails` (inline) and `WidgetSummary` (async) projections.
-- [ ] **fixtures:** Build `PostgresContainerFixture` (assembly fixture), the abstract `HarnessHostFixture` with conjoined tenancy and per-host schemas, `NoDaemonHostFixture`, `DaemonHostFixture`, and the `NoDaemonCollection` and `DaemonCollection` definitions. Each host starts and stops cleanly against the shared container.
-- [ ] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait.
+- [x] **test-domain:** Build `TestDomain/`: the `Widget` aggregate, its events, the `RenameWidget`, `PublishWidget`, `FailWidget`, `StallWidget` and `ArchiveWidget` commands and handlers, the `GetWidgetById` query and handler, and the `WidgetDetails` (inline) and `WidgetSummary` (async) projections.
+- [x] **fixtures:** Build `PostgresContainerFixture` (assembly fixture), the abstract `HarnessHostFixture` with conjoined tenancy and per-host schemas, `NoDaemonHostFixture`, `DaemonHostFixture`, and the `NoDaemonCollection` and `DaemonCollection` definitions. Each host starts and stops cleanly against the shared container.
+- [x] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait. Done: 40 tests (plus `DaemonProjectionSyncTests` for the daemon host), green three runs in a row in about 15 seconds. Extra test-domain messages added along the way: `FailWidgetLater`, `TimeOutWidget`, `RecordTenant`, `UnhandledCommand` and `FindWidget`.
 - [ ] **versioning:** Add `GitVersion.yml` (copied from awen) and the `GitVersion.MsBuild` reference in `src/Directory.Build.props`. `just build` produces assemblies whose informational version is `{SemVer}+{ShortSha}`, and `obj/gitversion.json` exists.
 - [ ] **ci:** Add `.github/workflows/build.yml` as described in **Files**. A pull request run builds, prints the GitVersion `SemVer`, runs the full test suite (including the Testcontainers tests) and uploads the `trx` results.
 - [ ] **docs-reference:** Write `docs/reference/` (`api.md`, `harness-options.md`, `failure-messages.md`, `compatibility.md`) from the finished code and XML comments. Every public member and every failure in the harness appears exactly once, in the layout described in **Documentation**.
