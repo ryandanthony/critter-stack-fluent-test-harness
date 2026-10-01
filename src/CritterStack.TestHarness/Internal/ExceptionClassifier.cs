@@ -19,13 +19,20 @@ internal static class ExceptionClassifier
     private const string TrackedSessionTimeoutMessage = "This TrackedSession timed out";
 
     /// <summary>
+    /// A real tracking timeout only fires once the configured timeout has passed. A slightly early timer is
+    /// tolerated; a handler's own <see cref="TimeoutException"/> thrown well before then is not a tracking timeout.
+    /// </summary>
+    private const double TimeoutTolerance = 0.9;
+
+    /// <summary>
     /// Describes why an exception from a <c>When</c> or <c>WhenQuery</c> is an infrastructure failure.
     /// </summary>
     /// <param name="exception">The exception the invoke threw.</param>
     /// <param name="messageType">The command or query type.</param>
     /// <param name="trackingTimeout">The tracking timeout in force.</param>
+    /// <param name="elapsed">How long the invoke ran before it threw.</param>
     /// <returns>The reason, or null if the exception came from the handler.</returns>
-    internal static string? InfrastructureReason(Exception exception, Type messageType, TimeSpan trackingTimeout)
+    internal static string? InfrastructureReason(Exception exception, Type messageType, TimeSpan trackingTimeout, TimeSpan elapsed)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
@@ -34,12 +41,24 @@ internal static class ExceptionClassifier
             return $"no Wolverine handler is registered for {Failure.TypeName(messageType)}";
         }
 
-        if (IsTrackingTimeout(exception))
+        if (IsTrackedSessionWrapper(exception) && elapsed >= trackingTimeout * TimeoutTolerance)
         {
             return $"Wolverine tracking timed out after {trackingTimeout} (TrackingTimeout) waiting for {Failure.TypeName(messageType)} and its cascaded messages";
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Gets the exception a <c>ThenThrows</c> should see for a handler exception. Wolverine's tracked session wraps
+    /// a handler's own <see cref="TimeoutException"/> in its "TrackedSession timed out" exception; this unwraps it.
+    /// </summary>
+    /// <param name="exception">The exception the invoke threw, already known not to be infrastructure.</param>
+    /// <returns>The handler's exception.</returns>
+    internal static Exception HandlerException(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return IsTrackedSessionWrapper(exception) ? exception.InnerException! : exception;
     }
 
     /// <summary>
@@ -81,7 +100,7 @@ internal static class ExceptionClassifier
         return Failure.TypeName(exception.GetType());
     }
 
-    private static bool IsTrackingTimeout(Exception exception) =>
+    private static bool IsTrackedSessionWrapper(Exception exception) =>
         exception is TimeoutException
         && exception.InnerException is TimeoutException
         && exception.Message.StartsWith(TrackedSessionTimeoutMessage, StringComparison.Ordinal);

@@ -62,7 +62,7 @@ internal sealed class WhenQueryStep<TResponse> : IActionStep
         }
         catch (Exception ex)
         {
-            var reason = ExceptionClassifier.InfrastructureReason(ex, query.GetType(), context.Options.TrackingTimeout);
+            var reason = ExceptionClassifier.InfrastructureReason(ex, query.GetType(), context.Options.TrackingTimeout, TimeSpan.Zero);
             if (reason is not null)
             {
                 throw Failure.Create(context.CurrentStepLabel, reason, ex);

@@ -27,3 +27,8 @@ public sealed record WidgetPublished(Guid Id);
 /// <summary>A widget was archived.</summary>
 /// <param name="Id">The widget id.</param>
 public sealed record WidgetArchived(Guid Id);
+
+/// <summary>Records which tenant the handler's session ran as.</summary>
+/// <param name="Id">The widget id.</param>
+/// <param name="TenantId">The session's tenant id.</param>
+public sealed record TenantRecorded(Guid Id, string TenantId);

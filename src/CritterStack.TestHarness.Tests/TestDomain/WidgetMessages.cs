@@ -50,6 +50,10 @@ public sealed record ArchiveWidget(Guid Id);
 /// <summary>A command with no handler.</summary>
 public sealed record UnhandledCommand;
 
+/// <summary>Appends a <see cref="TenantRecorded"/> with the handler session's tenant id.</summary>
+/// <param name="Id">The widget id.</param>
+public sealed record RecordTenant(Guid Id);
+
 /// <summary>Returns the async <see cref="WidgetSummary"/> for a widget.</summary>
 /// <param name="Id">The widget id.</param>
 public sealed record GetWidgetById(Guid Id);

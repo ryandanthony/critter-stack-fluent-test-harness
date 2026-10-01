@@ -57,6 +57,7 @@ internal sealed class WhenCommandStep : IActionStep
         }
 
         var tenantId = context.TenantId;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             context.TrackedSession = await tracking
@@ -71,13 +72,13 @@ internal sealed class WhenCommandStep : IActionStep
         }
         catch (Exception ex)
         {
-            var reason = ExceptionClassifier.InfrastructureReason(ex, command.GetType(), context.Options.TrackingTimeout);
+            var reason = ExceptionClassifier.InfrastructureReason(ex, command.GetType(), context.Options.TrackingTimeout, stopwatch.Elapsed);
             if (reason is not null)
             {
                 throw Failure.Create(context.CurrentStepLabel, reason, ex);
             }
 
-            context.ActionException = ex;
+            context.ActionException = ExceptionClassifier.HandlerException(ex);
         }
         finally
         {

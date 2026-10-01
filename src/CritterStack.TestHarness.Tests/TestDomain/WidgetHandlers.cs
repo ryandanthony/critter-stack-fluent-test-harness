@@ -39,6 +39,16 @@ public static class WidgetHandlers
     /// <param name="notice">The notice.</param>
     public static void Handle(WidgetPublishedNotice notice) => ArgumentNullException.ThrowIfNull(notice);
 
+    /// <summary>Appends the session's tenant id, to prove which tenant the handler ran as.</summary>
+    /// <param name="command">The command.</param>
+    /// <param name="session">The session.</param>
+    public static void Handle(RecordTenant command, IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(session);
+        session.Events.Append(command.Id, new TenantRecorded(command.Id, session.TenantId));
+    }
+
     /// <summary>Always throws.</summary>
     /// <param name="command">The command.</param>
     public static void Handle(FailWidget command) =>
