@@ -396,6 +396,8 @@ Every test gets a `business_value` trait that states what the test protects.
 ## Open decisions
 
 - **Wrong `TResponse` on `WhenQuery`.** Verified: `bus.InvokeAsync<TResponse>` (and `InvokeForTenantAsync<TResponse>`) do **not** throw when the handler returns a different type; they return `default(TResponse)`. The design assumed an exception. Until this is decided, `WhenQuery` treats the result as-is, so `ThenResult` sees `null`.
+  - **Feasibility of a type check (verified):** `InvokeAsync<object>` / `InvokeForTenantAsync<object>` return the handler's real response object (e.g. a `WidgetSummary`), so the harness can invoke as `object` and check `is TResponse` itself, failing with "expected `<TResponse>`, handler returned `<actual type>`". A handler with no return value gives `null`, so the same check also catches "this query handler returns nothing".
+  - Options: **A** invoke as `object` and type-check (fail at once as an infrastructure failure on mismatch); **B** fail only when the result is `null`/default; **C** keep Wolverine's behaviour and document it.
 
 ## Documentation
 
