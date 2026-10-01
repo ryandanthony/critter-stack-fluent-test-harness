@@ -43,7 +43,8 @@ public class WidgetScenarios(HarnessHostFixture fixture)
             .Setup(fixture.Host, o => o.ProjectionTimeout = TimeSpan.FromSeconds(30))
             .GivenStream<Widget>(id1, id => [new WidgetCreated(id, "Sprocket")])
             .When(() => new RenameWidget(id1, "Gear"))
-            .ThenStreamHasEvent<WidgetRenamed>(id1, e => e.Name == "Gear")
+            .ThenAppended<WidgetRenamed>(id1, e => e.Name == "Gear")
+            .ThenAppendedCount(id1, 1)
             .WhenQuery<WidgetSummary>(() => new GetWidgetById(id1))
             .ThenResult(r => r.Name == "Gear")
             .RunAsync(); // scenario is also awaitable directly
@@ -105,18 +106,24 @@ flowchart LR
   - `ThenThrows` after a `When` or `WhenQuery` that didn't throw fails with "expected `<type>`, nothing thrown".
   - Exception messages are not copied into failure text, because they may echo user data.
 - **Thens:**
-  - `ThenStreamHasEvent<T>(id, predicate)`
-  - `ThenStreamHasNoEvent<T>(id)`
-  - `ThenStreamEventCount(id, n)`
+  - **Appended-event assertions** (command stage only). These check only the events the most recent `When` appended:
+    - `ThenAppended<T>(id, predicate?)`
+    - `ThenNotAppended<T>(id)`
+    - `ThenAppendedCount(id, n)`
+  - **Whole-stream assertions** (after any `When` or `WhenQuery`). These read the full stream with `FetchStreamAsync`, including events from Givens and from earlier `When`s:
+    - `ThenStreamHasEvent<T>(id, predicate?)`
+    - `ThenStreamHasNoEvent<T>(id)`
+    - `ThenStreamEventCount(id, n)`
   - `ThenThrows<TException>(predicate?)`, valid after a `When` or a `WhenQuery`.
   - `ThenPublished<TMessage>(predicate?)`, which reads from the tracked session and is valid only after a `When`.
+- **How "appended" is measured:** because execution is deferred, the runner knows every stream id that an appended-event assertion uses before the `When` runs. Right before invoking the command, the `When` step reads `FetchStreamStateAsync` for each of those ids and stores the version (0 if the stream doesn't exist yet). The appended-event assertions then fetch the stream and look only at events with a version above that snapshot. Streams that no appended-event assertion mentions are never snapshotted.
 - **Step ordering:** the stage interfaces below enforce the order at compile time.
   - `When` is optional. A scenario can go straight from the Givens to `WhenQuery`, as in `Setup → GivenStream... → WhenQuery → ThenResult`, or even from `Setup` to `WhenQuery` with no Givens.
   - Givens are allowed only before the first `When` or `WhenQuery`.
-  - Stream assertions need a `When` or a `WhenQuery` before them.
+  - Whole-stream assertions need a `When` or a `WhenQuery` before them. Appended-event assertions need a `When`, because a query appends nothing.
   - `ThenThrows` exists after a `When` or a `WhenQuery`. `ThenPublished` exists only after a `When`, because a query invoke has no tracked session.
   - Projection sync runs after the last Given whether a `When` follows or a `WhenQuery` does.
-  - Each `Then` refers to the most recent `When` or `WhenQuery` before it.
+  - `ThenThrows`, `ThenResult`, `ThenPublished` and the appended-event assertions refer to the most recent `When` or `WhenQuery` before them. Whole-stream assertions always see the whole stream as it is when they run.
 - **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs `IMessageBus.InvokeAsync<TResponse>` and stores the typed response. `ThenResult(Func<TResponse, bool>)` asserts on it with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
 - **Failures:** the harness throws `ScenarioAssertionException`. The message names the failing step and lists the actual event *type names and versions* only. It never includes event or response payloads, because a consuming service's events may carry PII.
 - **No data wipe:** the harness never calls `ResetAllMartenDataAsync` or `CleanAllMartenDataAsync`, because those truncate tables. Isolating tests is the caller's job, for example with a fresh id per test.
@@ -149,7 +156,7 @@ public interface IGivenStage
     IQueryStage<TResponse> WhenQuery<TResponse>(Func<object> query);
 }
 
-// Steps valid after any When or WhenQuery.
+// Steps valid after any When or WhenQuery. Stream assertions here are whole-stream.
 public interface IThenStage<out TSelf> : IScenario
     where TSelf : IThenStage<TSelf>
 {
@@ -166,9 +173,16 @@ public interface IThenStage<out TSelf> : IScenario
     IQueryStage<TResponse> WhenQuery<TResponse>(Func<object> query);
 }
 
-// After When(command): adds the command-only assertions (tracked-session based).
+// After When(command): adds the command-only assertions (appended events and tracked session).
 public interface ICommandStage : IThenStage<ICommandStage>
 {
+    ICommandStage ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
+    ICommandStage ThenAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null);
+    ICommandStage ThenNotAppended<TEvent>(Guid id);
+    ICommandStage ThenNotAppended<TEvent>(string id);
+    ICommandStage ThenAppendedCount(Guid id, int expected);
+    ICommandStage ThenAppendedCount(string id, int expected);
+
     ICommandStage ThenPublished<TMessage>(Func<TMessage, bool>? predicate = null);
 }
 
@@ -185,7 +199,7 @@ stateDiagram-v2
     IGivenStage --> IGivenStage: GivenStream / ForTenant
     IGivenStage --> ICommandStage: When
     IGivenStage --> IQueryStage: WhenQuery
-    ICommandStage --> ICommandStage: ThenStream / ThenThrows / ThenPublished
+    ICommandStage --> ICommandStage: ThenAppended / ThenStream / ThenThrows / ThenPublished
     ICommandStage --> IQueryStage: WhenQuery
     IQueryStage --> IQueryStage: ThenResult / ThenThrows / ThenStream
     IQueryStage --> ICommandStage: When
@@ -215,8 +229,8 @@ Harness library:
 - `Stages/`: `IScenario.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
 - `ScenarioBuilder.cs` (internal): implements `IGivenStage` and `ICommandStage`, and records the steps.
 - `QueryStage.cs` (internal): implements `IQueryStage<TResponse>` over the same builder.
-- `Steps/`: `GivenStreamStep`, `WhenCommandStep`, `WhenQueryStep`, `StreamAssertionStep`, `ThrowsAssertionStep`, `PublishedAssertionStep`, `ResultAssertionStep`.
-- `ScenarioContext.cs`: holds the host, tracked session, last exception and last query result.
+- `Steps/`: `GivenStreamStep`, `WhenCommandStep`, `WhenQueryStep`, `StreamAssertionStep`, `AppendedAssertionStep`, `ThrowsAssertionStep`, `PublishedAssertionStep`, `ResultAssertionStep`.
+- `ScenarioContext.cs`: holds the host, tracked session, last exception, last query result and the stream-version snapshots taken before the most recent `When`.
 - `ScenarioAssertionException.cs`
 
 ## Tests
@@ -235,6 +249,9 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - a Given creates the stream, for both `Guid` and `string` ids;
   - steps run only on `RunAsync` or `await`;
   - a failed `ThenStreamHasEvent` throws `ScenarioAssertionException` without the payload in its message;
+  - `ThenAppended<WidgetCreated>` fails after a `When` when `WidgetCreated` came only from the Given, while `ThenStreamHasEvent<WidgetCreated>` passes;
+  - after two `When`s, `ThenAppended` and `ThenAppendedCount` see only the second command's events;
+  - `ThenAppended` works on a stream that the `When` itself creates (snapshot version 0);
   - `ThenThrows` captures a handler exception;
   - `ThenPublished` sees the cascaded message;
   - in `CatchUp` mode, `WhenQuery`/`ThenResult` reads the async read model;
