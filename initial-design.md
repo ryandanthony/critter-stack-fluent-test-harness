@@ -3,7 +3,7 @@ name: Fluent Critter Stack harness
 overview: A standalone, reusable, fluent Given/When/Then test harness for Marten and Wolverine. It plugs into any service's Alba host, sends commands and queries through Wolverine, and asserts on stream events and query results.
 todos:
   - id: verify-apis
-    content: Use Context7 to confirm the Marten 9 catch-up API and the Wolverine 6 tracking APIs
+    content: Use Context7 to confirm the Marten 9 catch-up and conjoined-tenancy APIs, the Wolverine 6 tracking and tenant-invoke APIs, and the exception types the infrastructure-failure classifier must recognise
     status: pending
   - id: scaffold
     content: Add the repo scaffolding (src/Directory.Packages.props, src/Directory.Build.props, src/CritterStack.TestHarness.slnx and a root justfile with build and test recipes)
@@ -159,7 +159,7 @@ flowchart LR
 
 Each method returns the interface for the next stage, so IntelliSense offers only valid steps and a misordered scenario fails to compile. The interfaces only limit what can be called next; behind them:
 
-- One internal, non-generic `ScenarioBuilder` owns the recorded step list and implements `IGivenStage` and `ICommandStage`.
+- One internal, non-generic `ScenarioBuilder` owns the recorded step list and implements `IScenarioStart`, `IGivenStage` and `ICommandStage`.
 - Each `WhenQuery<TResponse>` call returns a new, lightweight internal `QueryStage<TResponse>` that implements `IQueryStage<TResponse>` and forwards every call to the same `ScenarioBuilder`. A builder can't be generic, because `IGivenStage` and `ICommandStage` exist before any `TResponse` is known and each `WhenQuery` in a chain can use a different `TResponse`.
 
 ```csharp
