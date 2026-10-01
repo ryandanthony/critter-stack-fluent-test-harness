@@ -31,8 +31,8 @@ isProject: false
 ## Target API
 
 ```csharp
-[Collection("Harness")]
-public class WidgetScenarios(HarnessHostFixture fixture)
+[Collection(nameof(NoDaemonCollection))]
+public class WidgetScenarios(NoDaemonHostFixture fixture)
 {
     [Fact]
     public async Task Renaming_widget_appends_WidgetRenamed()
@@ -239,8 +239,8 @@ This is a standalone repo. The harness library lives in `src/CritterStack.TestHa
 Repo scaffolding:
 
 - `src/CritterStack.TestHarness.slnx`: solution file containing the harness and its test project.
-- `src/Directory.Packages.props`: central package versions for Alba, Marten 9.23, WolverineFx 6.26, WolverineFx.Marten, Testcontainers.PostgreSql and xunit.
-- `src/Directory.Build.props`: shared build settings, and adds xunit and the test SDK to every `*.Tests` project.
+- `src/Directory.Packages.props`: central package versions for Alba, Marten 9.23, WolverineFx 6.26, WolverineFx.Marten, Testcontainers.PostgreSql and xunit v3 (`xunit.v3`, needed for assembly fixtures).
+- `src/Directory.Build.props`: shared build settings, and adds xunit v3 and the test SDK to every `*.Tests` project.
 - `justfile` (repo root): `build` and `test` recipes over the slnx.
 
 Harness library:
@@ -265,8 +265,11 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message), `FailWidget` (whose handler throws `WidgetException`) and `StallWidget` (whose handler waits longer than a short test `TrackingTimeout`, to prove timeouts can't be claimed);
   - a query `GetWidgetById` plus its handler, which throws `WidgetNotFoundException` for an unknown id;
   - one inline read model and one async read model, `WidgetSummary`.
-- `Infrastructure/HarnessHostFixture.cs`: starts a Postgres Testcontainer, then `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. The event store uses conjoined tenancy (`Events.TenancyStyle = TenancyStyle.Conjoined`) and Wolverine's Marten integration routes invokes by tenant id, so `ForTenant` can be tested; scenarios without `ForTenant` run on the default tenant. It registers no daemon, so `CatchUp` is proven against a host that has none. A second fixture variant with `AddAsyncDaemon(Solo)` covers `WaitForNonStale`.
-- `Infrastructure/HarnessCollection.cs`: an xUnit collection fixture.
+- `Infrastructure/PostgresContainerFixture.cs`: an xUnit v3 assembly fixture (`[assembly: AssemblyFixture(typeof(PostgresContainerFixture))]`) that starts one Postgres Testcontainer for the whole test assembly and exposes its connection string.
+- `Infrastructure/HarnessHostFixture.cs`: an abstract base that takes the container fixture and builds `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. The event store uses conjoined tenancy (`Events.TenancyStyle = TenancyStyle.Conjoined`) and Wolverine's Marten integration routes invokes by tenant id, so `ForTenant` can be tested; scenarios without `ForTenant` run on the default tenant. Each subclass sets its own schema (both `DatabaseSchemaName` and `Events.DatabaseSchemaName`), so the two hosts never see each other's events or read models:
+  - `NoDaemonHostFixture`: schema `harness_nodaemon`, no daemon registered, so `CatchUp` is proven against a host that has none and `None` reliably leaves the async read model stale.
+  - `DaemonHostFixture`: schema `harness_daemon`, `AddAsyncDaemon(DaemonMode.Solo)`, for `WaitForNonStale`.
+- `Infrastructure/Collections.cs`: two xUnit collection definitions, `NoDaemonCollection` (uses `NoDaemonHostFixture`) and `DaemonCollection` (uses `DaemonHostFixture`). The collections run in parallel with each other; tests inside one collection run one after another.
 - `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
   - a Given creates the stream, in both its plain and `<TAggregate>` forms;
   - `ForTenant("a")` Givens, `When` and `ThenAppended` all run as tenant `a`, and the command handler's session sees tenant `a`;
@@ -295,7 +298,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - `ThenThrows` when nothing was thrown fails;
   - `WhenQuery<TResponse>` with the wrong response type surfaces as a `ScenarioAssertionException` that names the step and keeps Wolverine's exception as `InnerException`;
   - an unclaimed handler exception's `ScenarioAssertionException` has the original handler exception as `InnerException`.
-- Package needs: Alba, Marten, WolverineFx, WolverineFx.Marten and Testcontainers.PostgreSql, all pinned in `src/Directory.Packages.props`. xunit comes from `src/Directory.Build.props` for `*.Tests`.
+- Package needs: Alba, Marten, WolverineFx, WolverineFx.Marten and Testcontainers.PostgreSql, all pinned in `src/Directory.Packages.props`. xunit v3 comes from `src/Directory.Build.props` for `*.Tests`.
 
 Every test gets a `business_value` trait that states what the test protects.
 
