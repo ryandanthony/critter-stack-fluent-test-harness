@@ -145,7 +145,10 @@ flowchart LR
 
 ## Fluent stage interfaces
 
-Each method returns the interface for the next stage, so IntelliSense offers only valid steps and a misordered scenario fails to compile. One internal `ScenarioBuilder<TResponse>` implements all of them and records steps; the interfaces only limit what can be called next.
+Each method returns the interface for the next stage, so IntelliSense offers only valid steps and a misordered scenario fails to compile. The interfaces only limit what can be called next; behind them:
+
+- One internal, non-generic `ScenarioBuilder` owns the recorded step list and implements `IGivenStage` and `ICommandStage`.
+- Each `WhenQuery<TResponse>` call returns a new, lightweight internal `QueryStage<TResponse>` that implements `IQueryStage<TResponse>` and forwards every call to the same `ScenarioBuilder`. A builder can't be generic, because `IGivenStage` and `ICommandStage` exist before any `TResponse` is known and each `WhenQuery` in a chain can use a different `TResponse`.
 
 ```csharp
 namespace CritterStack.TestHarness;
@@ -223,7 +226,7 @@ stateDiagram-v2
 ```
 
 - Only `ICommandStage` and `IQueryStage` can be run or awaited. A scenario with only Givens has nothing to check, so it won't compile as a runnable scenario.
-- Inside the harness, steps share one recorded list. The typed `IQueryStage<TResponse>` is a thin wrapper over that list, so switching between commands and queries keeps the full history.
+- Because every `QueryStage<TResponse>` forwards to the one `ScenarioBuilder`, switching between commands and queries keeps the full history in a single step list.
 
 ## Files
 
@@ -243,7 +246,7 @@ Harness library:
 - `HarnessOptions.cs`
 - `Stages/`: `IScenario.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
 - `ScenarioBuilder.cs` (internal): implements `IGivenStage` and `ICommandStage`, and records the steps.
-- `QueryStage.cs` (internal): implements `IQueryStage<TResponse>` over the same builder.
+- `QueryStage.cs` (internal): `QueryStage<TResponse>`, created per `WhenQuery` call. It implements `IQueryStage<TResponse>` and forwards to the owning `ScenarioBuilder`.
 - `Steps/`: `GivenStreamStep`, `WhenCommandStep`, `WhenQueryStep`, `StreamAssertionStep`, `AppendedAssertionStep`, `ThrowsAssertionStep`, `PublishedAssertionStep`, `ResultAssertionStep`.
 - `ScenarioContext.cs`: holds the host, tracked session, last exception, last query result and the stream-version snapshots taken before the most recent `When`.
 - `ScenarioAssertionException.cs`
