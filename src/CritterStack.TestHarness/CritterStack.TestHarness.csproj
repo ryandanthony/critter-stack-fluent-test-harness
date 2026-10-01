@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>CritterStack.TestHarness</RootNamespace>
+    <Description>Fluent Given/When/Then test harness for Marten and Wolverine.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Alba" />
+    <PackageReference Include="Marten" />
+    <PackageReference Include="WolverineFx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CritterStack.TestHarness.Tests" />
+  </ItemGroup>
+
+</Project>

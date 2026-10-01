@@ -1,2 +1,10 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="stylecop.json" />
+  </Folder>
+  <Project Path="CritterStack.TestHarness/CritterStack.TestHarness.csproj" />
+  <Project Path="CritterStack.TestHarness.Tests/CritterStack.TestHarness.Tests.csproj" />
 </Solution>

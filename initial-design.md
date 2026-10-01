@@ -248,7 +248,7 @@ This is a standalone repo. The harness library lives in `src/CritterStack.TestHa
 Repo scaffolding:
 
 - `src/CritterStack.TestHarness.slnx`: solution file containing the harness and its test project.
-- `global.json` (repo root): pins the .NET 10 SDK (`10.0.302`, `rollForward: latestFeature`).
+- `global.json` (repo root): pins the .NET 10 SDK (`10.0.302`, `rollForward: latestFeature`) and sets `"test": { "runner": "Microsoft.Testing.Platform" }`. xunit v3 runs on Microsoft.Testing.Platform, and the .NET 10 SDK refuses to run it through the old VSTest `dotnet test` path without this opt-in (verified).
 - `nuget.config` (repo root): copied from awen. It clears the default sources, then adds nuget.org and the festina-lente-io GitHub Packages feed, and maps `FestinaLente.*` to the GitHub feed and everything else to nuget.org:
 
   ```xml
@@ -304,7 +304,7 @@ Repo scaffolding:
   - Conventional Commit bump messages: `type!:` is major, `feat:` is minor, `fix:` is patch, and `docs`/`style`/`chore`/`ci`/`build`/`test`/`refactor` don't bump;
   - branches: `main` (ContinuousDeployment, no label, patch increment), `feature/`/`feat/` (label `{BranchName}`), `NNN-` spec branches (label `alpha`) and `pull/`/`pr/` (label `pr`).
   - `GitVersion.MsBuild` stamps the version into every assembly at build time and writes `obj/gitversion.json`, so there is no hand-maintained version anywhere in the repo.
-- `justfile` (repo root): `restore`, `build` (Release, over the slnx) and `test` (depends on `build`; runs `dotnet test --no-build` in Release with a `trx` logger) recipes.
+- `justfile` (repo root): `restore`, `build` (Release, over the slnx) and `test` (depends on `build`; runs `dotnet test --solution src/CritterStack.TestHarness.slnx --no-build --configuration Release --report-xunit-trx --results-directory TestResults`) recipes. Microsoft.Testing.Platform exits with code 8 when zero tests run, so `just test` fails until the first test exists.
 - `.github/workflows/build.yml`: CI, modelled on awen's `build.yml`. Runs on pull requests to `main`, pushes to `main` and `workflow_dispatch`, on `ubuntu-latest` (which has Docker, so Testcontainers works without setup). Steps:
   1. `actions/checkout@v4` with `fetch-depth: 0` (GitVersion needs the full history and tags);
   2. `actions/setup-dotnet@v4` (SDK from `global.json`);
@@ -462,7 +462,7 @@ In build order. Each item lists what "done" means.
   - Update the design (pinned versions, API names, the **Risks** section) wherever something differs.
   - Done 2026-10-01 via Context7, reflection and a runtime probe (see **Risks**). It changed the design in six places: the two-path `CatchUp`, the classifier table, the `WolverineFx.RuntimeCompilation` package, the `ExecuteAndWaitAsync` lambda cast, `IncludeType` handler discovery, `ThenPublished` reading `Sent`, and `WhenQuery` type-checking the response itself (Wolverine returns `default` for a wrong `TResponse` instead of throwing).
 - [x] **scaffold:** Add `global.json` (.NET 10 SDK), `nuget.config` (nuget.org plus the festina-lente-io GitHub feed, with source mapping), `src/Directory.Packages.props` (the pinned versions in **Files**), `src/Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings as errors, CodeStandards, xunit v3 and the test SDK for `*.Tests`), `src/Directory.Build.targets` and `src/stylecop.json` (both from awen), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `FestinaLente.CodeStandards` restores from the GitHub feed, and `just build` succeeds on an empty solution.
-- [ ] **project:** Create both projects and add them to the slnx:
+- [x] **project:** Create both projects and add them to the slnx:
   - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
   - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten, WolverineFx.RuntimeCompilation and Testcontainers.PostgreSql).
 - [ ] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`, each with full XML doc comments (see **Documentation**). The Target API sample compiles, a misordered chain doesn't, and the build has no CS1591 warnings.
