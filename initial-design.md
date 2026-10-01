@@ -237,10 +237,27 @@ Repo scaffolding:
   | xunit.v3 (needed for assembly fixtures) | 4.0.1 |
   | xunit.runner.visualstudio | 4.0.0 |
   | Microsoft.NET.Test.Sdk | 18.10.1 |
+  | GitVersion.MsBuild | 6.8.2 |
 
   All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies.
-- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, and xunit v3 and the test SDK added to every `*.Tests` project.
-- `justfile` (repo root): `build` and `test` recipes over the slnx.
+- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` (`PrivateAssets="all"`) on every project, and xunit v3 and the test SDK added to every `*.Tests` project.
+- `GitVersion.yml` (repo root): copied from `ryandanthony/awen` so versioning works the same way across repos:
+  - `mode: ContinuousDelivery`, `tag-prefix: v`, strategies `Mainline` and `TaggedCommit`;
+  - assembly version `MajorMinor`, file version `MajorMinorPatch`, informational version `{SemVer}+{ShortSha}`;
+  - Conventional Commit bump messages: `type!:` is major, `feat:` is minor, `fix:` is patch, and `docs`/`style`/`chore`/`ci`/`build`/`test`/`refactor` don't bump;
+  - branches: `main` (ContinuousDeployment, no label, patch increment), `feature/`/`feat/` (label `{BranchName}`), `NNN-` spec branches (label `alpha`) and `pull/`/`pr/` (label `pr`).
+  - `GitVersion.MsBuild` stamps the version into every assembly at build time and writes `obj/gitversion.json`, so there is no hand-maintained version anywhere in the repo.
+- `justfile` (repo root): `restore`, `build` (Release, over the slnx) and `test` (depends on `build`; runs `dotnet test --no-build` in Release with a `trx` logger) recipes.
+- `.github/workflows/build.yml`: CI, modelled on awen's `build.yml`. Runs on pull requests to `main`, pushes to `main` and `workflow_dispatch`, on `ubuntu-latest` (which has Docker, so Testcontainers works without setup). Steps:
+  1. `actions/checkout@v4` with `fetch-depth: 0` (GitVersion needs the full history and tags);
+  2. `actions/setup-dotnet@v4` (SDK from `global.json`);
+  3. `actions/cache@v4` for `~/.nuget/packages`, keyed on the csproj and props files;
+  4. install `just` (`extractions/setup-just`);
+  5. `just build`;
+  6. extract the version from `src/CritterStack.TestHarness/obj/gitversion.json` (`SemVer` and `MajorMinorPatch`) into step outputs and the job summary;
+  7. `just test`;
+  8. upload the `*.trx` files as a workflow artifact (`actions/upload-artifact@v4`, `if: always()`), so failed runs keep their results.
+  - No packing, tagging or publishing in v1. The extracted version is ready for a later release job (awen's `softprops/action-gh-release` and NuGet push steps are the model).
 
 Harness library:
 
@@ -344,4 +361,6 @@ In build order. Each item lists what "done" means.
 - [ ] **test-domain:** Build `TestDomain/`: the `Widget` aggregate, its events, the `RenameWidget`, `PublishWidget`, `FailWidget`, `StallWidget` and `ArchiveWidget` commands and handlers, the `GetWidgetById` query and handler, and the `WidgetDetails` (inline) and `WidgetSummary` (async) projections.
 - [ ] **fixtures:** Build `PostgresContainerFixture` (assembly fixture), the abstract `HarnessHostFixture` with conjoined tenancy and per-host schemas, `NoDaemonHostFixture`, `DaemonHostFixture`, and the `NoDaemonCollection` and `DaemonCollection` definitions. Each host starts and stops cleanly against the shared container.
 - [ ] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait.
-- [ ] **verify:** Run `just build` and `just test` until both are green with no warnings. Requires Docker for Testcontainers.
+- [ ] **versioning:** Add `GitVersion.yml` (copied from awen) and the `GitVersion.MsBuild` reference in `src/Directory.Build.props`. `just build` produces assemblies whose informational version is `{SemVer}+{ShortSha}`, and `obj/gitversion.json` exists.
+- [ ] **ci:** Add `.github/workflows/build.yml` as described in **Files**. A pull request run builds, prints the GitVersion `SemVer`, runs the full test suite (including the Testcontainers tests) and uploads the `trx` results.
+- [ ] **verify:** Run `just build` and `just test` until both are green with no warnings (requires Docker for Testcontainers), then push and confirm the `build.yml` run is green.
