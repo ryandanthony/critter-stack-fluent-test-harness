@@ -1,28 +1,6 @@
 ---
 name: Fluent Critter Stack harness
 overview: A standalone, reusable, fluent Given/When/Then test harness for Marten and Wolverine. It plugs into any service's Alba host, sends commands and queries through Wolverine, and asserts on stream events and query results.
-todos:
-  - id: verify-apis
-    content: Use Context7 to confirm the Marten 9 catch-up and conjoined-tenancy APIs, the Wolverine 6 tracking and tenant-invoke APIs, and the exception types the infrastructure-failure classifier must recognise
-    status: pending
-  - id: scaffold
-    content: Add the repo scaffolding (src/Directory.Packages.props, src/Directory.Build.props, src/CritterStack.TestHarness.slnx and a root justfile with build and test recipes)
-    status: pending
-  - id: project
-    content: Create the CritterStack.TestHarness and CritterStack.TestHarness.Tests projects
-    status: pending
-  - id: core
-    content: Implement TestHarness.Setup, HarnessOptions, ScenarioBuilder (deferred, awaitable) and ScenarioContext
-    status: pending
-  - id: steps
-    content: Implement the Given/When/WhenQuery/Then steps, plus ScenarioAssertionException with JSON payloads of the actual events and query response in its messages
-    status: pending
-  - id: tests
-    content: Build the TestHarness.Tests Widget test domain, the Postgres and Alba fixtures (with and without a daemon) and the harness test suites
-    status: pending
-  - id: verify
-    content: Run just build and just test until both are green
-    status: pending
 isProject: false
 ---
 
@@ -318,3 +296,13 @@ Every test gets a `business_value` trait that states what the test protects.
 
 - I will confirm these Marten 9.23 and Wolverine 6.26 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
+
+## Todos
+
+- [ ] **verify-apis:** Use Context7 to confirm the Marten 9 catch-up and conjoined-tenancy APIs, the Wolverine 6 tracking and tenant-invoke APIs, and the exception types the infrastructure-failure classifier must recognise.
+- [ ] **scaffold:** Add the repo scaffolding (`src/Directory.Packages.props`, `src/Directory.Build.props`, `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes).
+- [ ] **project:** Create the `CritterStack.TestHarness` and `CritterStack.TestHarness.Tests` projects.
+- [ ] **core:** Implement `TestHarness.Setup`, `HarnessOptions`, `ScenarioBuilder` (deferred, awaitable) and `ScenarioContext`.
+- [ ] **steps:** Implement the Given/When/WhenQuery/Then steps, plus `ScenarioAssertionException` with JSON payloads of the actual events and query response in its messages.
+- [ ] **tests:** Build the `TestHarness.Tests` Widget test domain, the Postgres and Alba fixtures (with and without a daemon) and the harness test suites.
+- [ ] **verify:** Run `just build` and `just test` until both are green.
