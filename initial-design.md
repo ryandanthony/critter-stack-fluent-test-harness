@@ -240,7 +240,7 @@ Repo scaffolding:
   | GitVersion.MsBuild | 6.8.2 |
 
   All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies.
-- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` (`PrivateAssets="all"`) on every project, and xunit v3 and the test SDK added to every `*.Tests` project.
+- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` (`PrivateAssets="all"`) on every project, and xunit v3 and the test SDK added to every `*.Tests` project. `GenerateDocumentationFile` is on for non-test projects, so with warnings as errors a missing XML doc comment on any public member (CS1591) fails the build.
 - `GitVersion.yml` (repo root): copied from `ryandanthony/awen` so versioning works the same way across repos:
   - `mode: ContinuousDelivery`, `tag-prefix: v`, strategies `Mainline` and `TaggedCommit`;
   - assembly version `MajorMinor`, file version `MajorMinorPatch`, informational version `{SemVer}+{ShortSha}`;
@@ -286,6 +286,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - `NoDaemonHostFixture`: schema `harness_nodaemon`, no daemon registered, so `CatchUp` is proven against a host that has none and `None` reliably leaves the async read model stale.
   - `DaemonHostFixture`: schema `harness_daemon`, `AddAsyncDaemon(DaemonMode.Solo)`, for `WaitForNonStale`.
 - `Infrastructure/Collections.cs`: two xUnit collection definitions, `NoDaemonCollection` (uses `NoDaemonHostFixture`) and `DaemonCollection` (uses `DaemonHostFixture`). The collections run in parallel with each other; tests inside one collection run one after another.
+- `DocSamples/`: one test class per tutorial or how-to page, holding that page's code blocks so they compile and pass (see **Documentation**).
 - `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
   - a Given creates the stream, in both its plain and `<TAggregate>` forms;
   - two `GivenStream` calls with the same id build one stream (start, then append), and `ThenStreamEventCount` sees all of their events;
@@ -328,6 +329,60 @@ Every test gets a `business_value` trait that states what the test protects.
 - I will confirm these Marten 9.44 and Wolverine 6.44 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
 
+## Documentation
+
+User docs follow [Diátaxis](https://diataxis.fr/). It separates four kinds of documentation by what the reader needs, and keeps each page to one kind:
+
+| Kind | Reader is... | Informs | Serves | Here, it answers |
+|---|---|---|---|---|
+| Tutorial | learning | action | study | "Show me, step by step, a scenario that works." |
+| How-to guide | working | action | work | "How do I test X with the harness?" |
+| Reference | working | cognition | work | "What exactly does this method / option / failure do?" |
+| Explanation | studying | cognition | study | "Why does the harness behave this way?" |
+
+Docs live in `docs/` as plain Markdown that renders on GitHub (no site generator in v1). The target shape is below. Following Diátaxis's own workflow, folders and pages are **not** created empty up front: a page is only added once it has real content, and a section folder appears when its first page does. For v1 the pages are written after the code they describe (see the `docs-*` todos); after v1, any change to the harness updates the affected pages in the same pull request.
+
+```
+README.md                          what it is, a 10-line example, links into docs/, build commands
+docs/
+  index.md                         the four sections and when to read each
+  tutorials/
+    first-scenario.md              add the harness to a small service, write a Given/When/Then, run it green, break it on purpose and read the failure
+  how-to/
+    add-to-a-service.md            copy the project in, add package versions, wire it to an existing Alba fixture
+    choose-projection-sync.md      pick CatchUp / WaitForNonStale / None for your host
+    test-expected-exceptions.md    ThenThrows first, predicates, what can't be claimed
+    assert-published-messages.md   ThenPublished, hosts with real transports, IncludeExternalMessages, TrackingTimeout
+    test-multi-tenant-handlers.md  ForTenant and tenant isolation
+    query-read-models.md           When then WhenQuery, ThenResult
+    debug-a-failing-scenario.md    reading the failure message, payloads, InnerException
+  reference/
+    api.md                         every stage and method, laid out to mirror the stage interfaces, with the valid-next-step table
+    harness-options.md             every HarnessOptions field: type, default, effect
+    failure-messages.md            every failure the harness raises: when, message shape, claimable or not
+    compatibility.md               supported .NET, Marten, Wolverine and Alba versions; v1 limits (Guid ids, main store)
+  explanation/
+    execution-model.md             deferred steps, the runner, why the chain is synchronous
+    appended-vs-whole-stream.md    the two kinds of stream assertion and the version snapshot
+    projection-sync.md             why sync runs before When and WhenQuery, and the dirty flag
+    exception-handling.md          handler vs infrastructure failures, why unclaimed exceptions fail early
+    design-decisions.md            portability, no data wipe, one tenant per scenario, payloads in failures, what v1 leaves out
+```
+
+Writing rules, from the Diátaxis guidance for each kind:
+
+- **Tutorial:** one guided path that is certain to succeed, with visible results early and often ("the test passes", then "now the failure shows the event JSON"). It states expected output at each step and keeps explanation to one line plus a link into `explanation/`.
+- **How-to guides:** assume a reader who already knows the harness and has a goal. Title each one "How to ...", give only the steps, and link out to reference and explanation rather than repeating them.
+- **Reference:** austere, complete, consistent. The layout mirrors the code (one section per stage interface, in the order the stages run), and each entry uses the same pattern: signature, stage it's valid on, stage it returns, behaviour, failure, short example. No instructions or opinions.
+- **Explanation:** the "why" lives only here. It may discuss alternatives and trade-offs (most of the answers in this design review belong here).
+- **Review check (the Diátaxis compass):** for each page, and for any paragraph that feels off, ask "action or cognition?" and "study or work?". If the answer doesn't match the page's section, move the content to the right page and link to it.
+
+Keeping the docs accurate:
+
+- **XML doc comments (reference in the IDE):** every public type and member in `CritterStack.TestHarness` has a `<summary>`, and methods have `<param>`, `<returns>` and, where useful, `<example>` and `<exception>`. Stage methods state the stage they're valid on and the stage they return, and Thens state which `When` or `WhenQuery` they refer to, so IntelliSense carries the step-ordering rules. These comments are reference material, so they follow the reference rules above. `GenerateDocumentationFile` plus warnings as errors makes a missing comment fail the build. `docs/reference/api.md` uses the same wording, so the two never disagree.
+- **Samples that compile and pass:** every code block in `docs/tutorials/` and `docs/how-to/` has a matching test in `src/CritterStack.TestHarness.Tests/DocSamples/`, one class per page. Each block carries a comment naming its test, and `just test` fails if a sample breaks.
+- **This design doc** (`initial-design.md`) is the build plan, not user documentation. Once v1 ships, the parts worth keeping move into `docs/explanation/design-decisions.md`.
+
 ## Todos
 
 In build order. Each item lists what "done" means.
@@ -342,7 +397,7 @@ In build order. Each item lists what "done" means.
 - [ ] **project:** Create both projects and add them to the slnx:
   - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
   - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten and Testcontainers.PostgreSql).
-- [ ] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`. The Target API sample compiles, and a misordered chain doesn't.
+- [ ] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`, each with full XML doc comments (see **Documentation**). The Target API sample compiles, a misordered chain doesn't, and the build has no CS1591 warnings.
 - [ ] **core:** Implement the internal plumbing:
   - `ScenarioBuilder` (records steps, holds the tenant id, implements `IScenarioStart`, `IGivenStage` and `ICommandStage`) and `QueryStage<TResponse>` (forwards to the builder);
   - `IScenarioStep` and `ScenarioRunner`: runs steps in order on `RunAsync`/`GetAwaiter`, honours the `CancellationToken`, and pre-scans the steps to find which stream ids each `When` must snapshot;
@@ -363,4 +418,9 @@ In build order. Each item lists what "done" means.
 - [ ] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait.
 - [ ] **versioning:** Add `GitVersion.yml` (copied from awen) and the `GitVersion.MsBuild` reference in `src/Directory.Build.props`. `just build` produces assemblies whose informational version is `{SemVer}+{ShortSha}`, and `obj/gitversion.json` exists.
 - [ ] **ci:** Add `.github/workflows/build.yml` as described in **Files**. A pull request run builds, prints the GitVersion `SemVer`, runs the full test suite (including the Testcontainers tests) and uploads the `trx` results.
+- [ ] **docs-reference:** Write `docs/reference/` (`api.md`, `harness-options.md`, `failure-messages.md`, `compatibility.md`) from the finished code and XML comments. Every public member and every failure in the harness appears exactly once, in the layout described in **Documentation**.
+- [ ] **docs-how-to:** Write the seven `docs/how-to/` guides, each with its code blocks backed by a `DocSamples/` test that passes.
+- [ ] **docs-tutorial:** Write `docs/tutorials/first-scenario.md`, backed by `DocSamples/` tests, and walk through it from a clean clone to confirm every step and expected output is right.
+- [ ] **docs-explanation:** Write the five `docs/explanation/` pages, moving the reasoning from this design review into them.
+- [ ] **docs-entry:** Write `docs/index.md` and replace `README.md` (what it is, a 10-line example, links into `docs/`, `just build` / `just test`). Run the compass check over every page and fix anything in the wrong section.
 - [ ] **verify:** Run `just build` and `just test` until both are green with no warnings (requires Docker for Testcontainers), then push and confirm the `build.yml` run is green.
