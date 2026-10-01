@@ -15,7 +15,7 @@ todos:
     content: Implement TestHarness.Setup, HarnessOptions, ScenarioBuilder (deferred, awaitable) and ScenarioContext
     status: pending
   - id: steps
-    content: Implement the Given/When/WhenQuery/Then steps, plus ScenarioAssertionException with no payloads in messages
+    content: Implement the Given/When/WhenQuery/Then steps, plus ScenarioAssertionException with JSON payloads of the actual events and query response in its messages
     status: pending
   - id: tests
     content: Build the TestHarness.Tests Widget test domain, the Postgres and Alba fixtures (with and without a daemon) and the harness test suites
@@ -131,7 +131,11 @@ flowchart LR
   - Projection sync runs after the last Given whether a `When` follows or a `WhenQuery` does.
   - `ThenThrows`, `ThenResult`, `ThenPublished` and the appended-event assertions refer to the most recent `When` or `WhenQuery` before them. Whole-stream assertions always see the whole stream as it is when they run.
 - **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs `IMessageBus.InvokeAsync<TResponse>` and stores the typed response. `ThenResult(Func<TResponse, bool>)` asserts on it with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
-- **Failures:** the harness throws `ScenarioAssertionException`. The message names the failing step and lists the actual event *type names and versions* only. It never includes event or response payloads, because a consuming service's events may carry PII.
+- **Failures:** the harness throws `ScenarioAssertionException`. The message names the failing step, then shows what was actually there so a failed predicate is easy to diagnose:
+  - stream assertions list each relevant event (the whole stream, or only the appended events for `ThenAppended*`) with its version, type name and JSON payload;
+  - `ThenResult` shows the query response as JSON;
+  - `ThenPublished` lists the tracked messages with their type names and JSON payloads.
+  - Payloads are serialized with the store's own Marten serializer (`IDocumentStore.Options.Serializer()`), so the JSON matches what is stored, including any custom converters. Payloads are included in full, because the harness only runs in tests.
 - **No data wipe:** the harness never calls `ResetAllMartenDataAsync` or `CleanAllMartenDataAsync`, because those truncate tables. Isolating tests is the caller's job, for example with a fresh id per test.
 
 ## Fluent stage interfaces
@@ -254,7 +258,8 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 - `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
   - a Given creates the stream, for both `Guid` and `string` ids;
   - steps run only on `RunAsync` or `await`;
-  - a failed `ThenStreamHasEvent` throws `ScenarioAssertionException` without the payload in its message;
+  - a failed `ThenStreamHasEvent` throws `ScenarioAssertionException` whose message includes each actual event's version, type name and JSON payload;
+  - a failed `ThenResult` includes the response as JSON in its message;
   - `ThenAppended<WidgetCreated>` fails after a `When` when `WidgetCreated` came only from the Given, while `ThenStreamHasEvent<WidgetCreated>` passes;
   - after two `When`s, `ThenAppended` and `ThenAppendedCount` see only the second command's events;
   - `ThenAppended` works on a stream that the `When` itself creates (snapshot version 0);
