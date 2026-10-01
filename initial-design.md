@@ -110,13 +110,15 @@ flowchart LR
     | Handler throws, `WhenQuery` | the handler's own exception, as-is | captured, claimable |
     | Tracking timeout | `System.TimeoutException` ("This TrackedSession timed out before all activity completed"), with an inner `TimeoutException`; thrown even with `DoNotAssertOnTimeout()` | infrastructure, fails at once |
     | No handler | `Wolverine.Runtime.Routing.IndeterminateRoutesException`, from both tracked and untracked invokes | infrastructure, fails at once |
-    | Wrong `TResponse` | **no exception.** Wolverine returns `default(TResponse)` (`null`, or `0` for value types) | see below |
+    | Wrong `TResponse` | **no exception.** Wolverine returns `default(TResponse)` (`null`, or `0` for value types) | the harness checks the type itself (see below); a mismatch is infrastructure, fails at once |
     | `CatchUp` path error | `ForceAll…` returns a non-empty `IReadOnlyList<Exception>`; `BuildProjectionDaemonAsync` path throws | infrastructure, fails at once |
     | `WaitForNonStale` timeout | `System.TimeoutException` | infrastructure, fails at once |
     | Given stream collision | `Marten.Exceptions.ExistingStreamIdCollisionException` from `SaveChangesAsync` | infrastructure, fails at once |
 
   - **Classification rule:** because a handler exception can be *any* type (including `TimeoutException`), the classifier goes by *where* the exception came from, not only its type: exceptions from projection sync and from Givens are always infrastructure; from a `When` or `WhenQuery`, `IndeterminateRoutesException` and the tracked session's own `TimeoutException` (identified by its message and inner `TimeoutException`, since a handler's `TimeoutException` has neither) are infrastructure, and everything else is a handler exception.
-  - **Wrong `TResponse` can't be detected from the exception, because there isn't one.** How the harness should report it is an open decision (see **Open decisions**).
+  - **Wrong `TResponse` is detected by the harness, not by Wolverine.** `WhenQuery<TResponse>` invokes with `InvokeAsync<object>` / `InvokeForTenantAsync<object>`, which returns the handler's real response object (verified), then checks it:
+    - a non-null result that isn't a `TResponse` fails at once: "`WhenQuery<TResponse>` expected `<TResponse>`, handler returned `<actual type>`";
+    - a `null` result is passed through as `default(TResponse)`. A query handler may legitimately return `null`, and Wolverine also gives `null` for a handler with no return value; the two can't be told apart, so `ThenResult`'s predicate receives `null` and decides.
   - `ThenThrows<T>` checks the most recent captured exception. Its type has to match `T` (including subclasses), or, if it is an `AggregateException` from a cascade, one of its `InnerExceptions` has to; the optional predicate runs against that matching exception.
   - An unclaimed exception fails the scenario at the first point where it could hide the real cause: the first `Then` after the throwing step that isn't a `ThenThrows`, or the next `When`/`WhenQuery`, or the end of the scenario, whichever comes first. That step doesn't run its own check. It reports "`<step>` threw `<type>`" with the original exception attached as `InnerException`. So when you expect an exception, put `ThenThrows` first:
     ```csharp
@@ -147,7 +149,7 @@ flowchart LR
   - `ThenThrows` exists after a `When` or a `WhenQuery`. `ThenPublished` exists only after a `When`, because a query invoke has no tracked session.
   - Projection sync runs before each `When` and `WhenQuery` when anything has been written since the last sync (see **Projection sync**).
   - `ThenThrows`, `ThenResult`, `ThenPublished` and the appended-event assertions refer to the most recent `When` or `WhenQuery` before them. Whole-stream assertions always see the whole stream as it is when they run.
-- **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs projection sync if needed, then runs `IMessageBus.InvokeAsync<TResponse>` (or `InvokeForTenantAsync`) and stores the typed response. Queries are not tracked, so anything a query handler cascades is not waited for. `ThenResult(Func<TResponse, bool>)` asserts on the response with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
+- **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs projection sync if needed, then runs `IMessageBus.InvokeAsync<object>` (or `InvokeForTenantAsync<object>`), checks the result is a `TResponse` (see **Captured exceptions**) and stores it typed. Queries are not tracked, so anything a query handler cascades is not waited for. `ThenResult(Func<TResponse, bool>)` asserts on the response with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
 - **Failures:** the harness throws `ScenarioAssertionException`. The message names the failing step, then shows what was actually there so a failed predicate is easy to diagnose:
   - stream assertions list each relevant event (the whole stream, or only the appended events for `ThenAppended*`) with its version, type name and JSON payload;
   - `ThenResult` shows the query response as JSON;
@@ -374,7 +376,8 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - `ThenStreamHasNoEvent<WidgetRenamed>(id, e => e.Name == "Gear")` passes when the stream only has a rename to another name, and fails when it has a rename to `"Gear"`; the same for `ThenNotAppended`;
   - `ThenResult` after a query that threw fails with a clear message;
   - `ThenThrows` when nothing was thrown fails;
-  - `WhenQuery<TResponse>` with the wrong response type is reported as described in **Open decisions** (Wolverine itself throws nothing and returns `default`);
+  - `WhenQuery<string>` against a handler that returns `WidgetSummary` fails at once with a `ScenarioAssertionException` naming the step, the expected type and the actual type (Wolverine itself throws nothing);
+  - a query whose handler returns `null` passes `null` to `ThenResult`'s predicate rather than failing;
   - a cascaded handler that throws surfaces as an `AggregateException` and `ThenThrows<WidgetException>()` still claims it;
   - a `When` command whose handler throws a `TimeoutException` of its own is claimable, while the tracked session's timeout is not;
   - `CatchUp` takes the `ForceAll…` path on the daemon host and the `BuildProjectionDaemonAsync` path on the no-daemon host, and both leave `WidgetSummary` current;
@@ -392,12 +395,6 @@ Every test gets a `business_value` trait that states what the test protects.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
 - `FestinaLente.CodeStandards` brings in analyzers (StyleCop and others) that, with warnings as errors, may flag code the design takes for granted, such as one public interface per file, file headers and member ordering. The first build after `scaffold` shows how strict it is. Fix the code to comply, and only suppress a rule in `.editorconfig` with a one-line reason.
 - Restore fails without a GitHub token for the `github` source, both locally and in CI.
-
-## Open decisions
-
-- **Wrong `TResponse` on `WhenQuery`.** Verified: `bus.InvokeAsync<TResponse>` (and `InvokeForTenantAsync<TResponse>`) do **not** throw when the handler returns a different type; they return `default(TResponse)`. The design assumed an exception. Until this is decided, `WhenQuery` treats the result as-is, so `ThenResult` sees `null`.
-  - **Feasibility of a type check (verified):** `InvokeAsync<object>` / `InvokeForTenantAsync<object>` return the handler's real response object (e.g. a `WidgetSummary`), so the harness can invoke as `object` and check `is TResponse` itself, failing with "expected `<TResponse>`, handler returned `<actual type>`". A handler with no return value gives `null`, so the same check also catches "this query handler returns nothing".
-  - Options: **A** invoke as `object` and type-check (fail at once as an infrastructure failure on mismatch); **B** fail only when the result is `null`/default; **C** keep Wolverine's behaviour and document it.
 
 ## Documentation
 
@@ -480,7 +477,7 @@ In build order. Each item lists what "done" means.
 - [ ] **steps:** Implement each step on top of `core`:
   - `GivenStreamStep` (start on first use of an id, append after);
   - `WhenCommandStep` (sync if dirty, snapshot versions, tracked invoke, capture handler exception, keep `ITrackedSession`);
-  - `WhenQueryStep` (sync if dirty, invoke, capture handler exception, store typed result);
+  - `WhenQueryStep` (sync if dirty, invoke as `object`, capture handler exception, fail at once on a non-null result that isn't `TResponse`, store typed result);
   - `StreamAssertionStep` (has / has-no with predicate / count, whole stream);
   - `AppendedAssertionStep` (appended / not-appended with predicate / count, since the snapshot);
   - `ThrowsAssertionStep`, `PublishedAssertionStep` and `ResultAssertionStep`.
