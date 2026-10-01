@@ -1,6 +1,6 @@
 # API reference
 
-Every public type and method in `CritterStack.TestHarness`, in the order a scenario uses them. Each method lists the stage it's on, the stage it returns, what it does, and how it fails. XML doc comments carry the same wording, so IntelliSense matches this page.
+Every public type and method in `CritterStack.TestHarness`, in the order a scenario uses them. Each method lists the stage it's on, the stage it returns, what it does, and how it fails. The XML doc comments describe the same behaviour, so IntelliSense and this page agree.
 
 ## Stages
 

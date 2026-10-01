@@ -321,14 +321,24 @@ Repo scaffolding:
 Harness library:
 
 - `src/CritterStack.TestHarness/CritterStack.TestHarness.csproj`: references Alba, Marten and WolverineFx with central versions. The csproj stays self-contained (no `ProjectReference`, no custom build imports), so a consuming service can copy the project and only needs those three packages in its own central versions. CodeStandards and GitVersion come from `Directory.Build.props`, not the csproj, so a consuming service doesn't inherit them (or the GitHub feed) when it copies the project.
+Public API (namespace `CritterStack.TestHarness`):
+
 - `TestHarness.cs`: static `Setup` entry point.
-- `HarnessOptions.cs`
-- `Stages/`: `IScenario.cs`, `IScenarioStart.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
-- `ScenarioBuilder.cs` (internal): implements `IScenarioStart`, `IGivenStage` and `ICommandStage`, records the steps and holds the scenario's tenant id.
-- `QueryStage.cs` (internal): `QueryStage<TResponse>`, created per `WhenQuery` call. It implements `IQueryStage<TResponse>` and forwards to the owning `ScenarioBuilder`.
-- `Steps/`: `GivenStreamStep`, `WhenCommandStep`, `WhenQueryStep`, `StreamAssertionStep`, `AppendedAssertionStep`, `ThrowsAssertionStep`, `PublishedAssertionStep`, `ResultAssertionStep`.
-- `ScenarioContext.cs`: holds the host, tracked session, last exception, last query result and the stream-version snapshots taken before the most recent `When`.
+- `HarnessOptions.cs` and `ProjectionSync.cs` (the sync-mode enum).
 - `ScenarioAssertionException.cs`
+- `Stages/`: `IScenario.cs`, `IScenarioStart.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
+
+Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
+
+- `ScenarioBuilder.cs`: implements `IScenarioStart`, `IGivenStage` and `ICommandStage`, records the steps and holds the scenario's tenant id. Exposes the last run's `ScenarioContext` to the test project (through `InternalsVisibleTo`) for the sync-count test.
+- `QueryStage.cs`: `QueryStage<TResponse>`, created per `WhenQuery` call. It implements `IQueryStage<TResponse>` and forwards to the owning `ScenarioBuilder`.
+- `ScenarioRunner.cs`: plans stream snapshots, runs the steps in order and enforces the unclaimed-exception rule.
+- `ScenarioContext.cs`: host, store, tenant, tracked session, captured exception, last query result, stream-version snapshots, the started-stream set, the projection-sync dirty flag and sync count.
+- `IScenarioStep.cs` and `StepKind.cs`: the step contract.
+- `ProjectionSyncRunner.cs`: the dirty-flag check and the three sync modes, including the two `CatchUp` paths.
+- `ExceptionClassifier.cs`: handler vs infrastructure classification, `ThenThrows` matching and `AggregateException` unwrapping.
+- `PayloadFormatter.cs` and `Failure.cs`: failure-message formatting with the store's serializer.
+- `Steps/`: `GivenStreamStep`, `WhenCommandStep`, `WhenQueryStep`, `StreamAssertionStep` (whole-stream and appended assertions, selected by `StreamScope` and `StreamCheck`), `ThrowsAssertionStep`, `PublishedAssertionStep`, `ResultAssertionStep`, plus the helpers `IActionStep`, `ActionMessage` and `Predicates`.
 
 ## Tests
 
@@ -344,9 +354,9 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 - `Infrastructure/HarnessHostFixture.cs`: an abstract base that takes the container fixture and builds `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. The event store uses conjoined tenancy (`Events.TenancyStyle = TenancyStyle.Conjoined`) and Wolverine's Marten integration routes invokes by tenant id, so `ForTenant` can be tested; scenarios without `ForTenant` run on the default tenant. Each subclass sets its own schema (`DatabaseSchemaName`, `Events.DatabaseSchemaName` and Wolverine's message storage schema through `IntegrateWithWolverine(x => x.MessageStorageSchemaName = ...)`), so the two hosts never see each other's events, read models or envelopes:
   - `NoDaemonHostFixture`: schema `harness_nodaemon`, no daemon registered, so `CatchUp` is proven against a host that has none and `None` reliably leaves the async read model stale.
   - `DaemonHostFixture`: schema `harness_daemon`, `AddAsyncDaemon(DaemonMode.Solo)`, for `WaitForNonStale`.
-- `Infrastructure/Collections.cs`: two xUnit collection definitions, `NoDaemonCollection` (uses `NoDaemonHostFixture`) and `DaemonCollection` (uses `DaemonHostFixture`). The collections run in parallel with each other; tests inside one collection run one after another.
-- `DocSamples/`: one test class per tutorial or how-to page, holding that page's code blocks so they compile and pass (see **Documentation**).
-- `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
+- `Infrastructure/NoDaemonCollection.cs` and `Infrastructure/DaemonCollection.cs`: two xUnit collection definitions, `NoDaemonCollection` (uses `NoDaemonHostFixture`) and `DaemonCollection` (uses `DaemonHostFixture`). The collections run in parallel with each other; tests inside one collection run one after another.
+- `DocSamples/`: the tutorial's fixture and samples (`WidgetServiceFixture`, `FirstScenarioSamples`), and the how-to samples (`HowToSamples` on the no-daemon host, `DaemonHowToSamples` on the daemon host). Each test names the page and section it backs (see **Documentation**).
+- `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `DaemonProjectionSyncTests.cs` (the daemon-host cases), `StepOrderingTests.cs` and `AssertionMessageTests.cs`, with `Scenarios.cs` as a small helper, which together cover:
   - a Given creates the stream, in both its plain and `<TAggregate>` forms;
   - two `GivenStream` calls with the same id build one stream (start, then append), and `ThenStreamEventCount` sees all of their events;
   - `ForTenant("a")` Givens, `When` and `ThenAppended` all run as tenant `a`, and the command handler's session sees tenant `a`;
@@ -447,8 +457,8 @@ Writing rules, from the Diátaxis guidance for each kind:
 
 Keeping the docs accurate:
 
-- **XML doc comments (reference in the IDE):** every public type and member in `CritterStack.TestHarness` has a `<summary>`, and methods have `<param>`, `<returns>` and, where useful, `<example>` and `<exception>`. Stage methods state the stage they're valid on and the stage they return, and Thens state which `When` or `WhenQuery` they refer to, so IntelliSense carries the step-ordering rules. These comments are reference material, so they follow the reference rules above. `GenerateDocumentationFile` plus warnings as errors makes a missing comment fail the build. `docs/reference/api.md` uses the same wording, so the two never disagree.
-- **Samples that compile and pass:** every code block in `docs/tutorials/` and `docs/how-to/` has a matching test in `src/CritterStack.TestHarness.Tests/DocSamples/`, one class per page. Each block carries a comment naming its test, and `just test` fails if a sample breaks.
+- **XML doc comments (reference in the IDE):** every public type and member in `CritterStack.TestHarness` has a `<summary>`, and methods have `<param>`, `<returns>` and, where useful, `<example>` and `<exception>`. Stage methods state the stage they're valid on and the stage they return, and Thens state which `When` or `WhenQuery` they refer to, so IntelliSense carries the step-ordering rules. These comments are reference material, so they follow the reference rules above. `GenerateDocumentationFile` plus warnings as errors makes a missing comment fail the build. `docs/reference/api.md` describes the same behaviour, but it is written by hand, so nothing checks automatically that the two stay in step. Update both together.
+- **Samples that compile and pass:** every C# code block and example failure message in `docs/tutorials/` and `docs/how-to/` has a matching test in `src/CritterStack.TestHarness.Tests/DocSamples/`, and each block carries a `<!-- Test: ... -->` comment naming it. `just test` fails if a sample's test breaks, and `DocSampleSyncTests` fails if any line of a C# sample block is missing from the `DocSamples/` sources or a marker names a test that doesn't exist (verified by editing a sample and watching it fail). Plain-text blocks such as example failure messages aren't line-checked; their tests assert the message shape instead.
 - **This design doc** (`initial-design.md`) is the build plan, not user documentation. Once v1 ships, the parts worth keeping move into `docs/explanation/design-decisions.md`.
 
 ## Todos
@@ -480,16 +490,16 @@ In build order. Each item lists what "done" means.
   - `WhenCommandStep` (sync if dirty, snapshot versions, tracked invoke, capture handler exception, keep `ITrackedSession`);
   - `WhenQueryStep` (sync if dirty, invoke as `object`, capture handler exception, fail at once on a non-null result that isn't `TResponse`, store typed result);
   - `StreamAssertionStep` (has / has-no with predicate / count, whole stream);
-  - `AppendedAssertionStep` (appended / not-appended with predicate / count, since the snapshot);
+  - appended / not-appended with predicate / count, since the snapshot (implemented in `StreamAssertionStep` with `StreamScope.Appended` rather than a separate class);
   - `ThrowsAssertionStep`, `PublishedAssertionStep` and `ResultAssertionStep`.
 - [x] **test-domain:** Build `TestDomain/`: the `Widget` aggregate, its events, the `RenameWidget`, `PublishWidget`, `FailWidget`, `StallWidget` and `ArchiveWidget` commands and handlers, the `GetWidgetById` query and handler, and the `WidgetDetails` (inline) and `WidgetSummary` (async) projections.
 - [x] **fixtures:** Build `PostgresContainerFixture` (assembly fixture), the abstract `HarnessHostFixture` with conjoined tenancy and per-host schemas, `NoDaemonHostFixture`, `DaemonHostFixture`, and the `NoDaemonCollection` and `DaemonCollection` definitions. Each host starts and stops cleanly against the shared container.
-- [x] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait. Done: 40 tests (plus `DaemonProjectionSyncTests` for the daemon host), green three runs in a row in about 15 seconds. Extra test-domain messages added along the way: `FailWidgetLater`, `TimeOutWidget`, `RecordTenant`, `UnhandledCommand` and `FindWidget`.
+- [x] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait. Done: 40 harness tests (including `DaemonProjectionSyncTests` for the daemon host), green three runs in a row in about 15 seconds. With the doc samples (19) and `DocSampleSyncTests` (16 page checks) the suite is 75 tests. Extra test-domain messages added along the way: `FailWidgetLater`, `TimeOutWidget`, `RecordTenant`, `UnhandledCommand` and `FindWidget`.
 - [x] **versioning:** Add `GitVersion.yml` (copied from awen) and the `GitVersion.MsBuild` reference in `src/Directory.Build.props`. `just build` produces assemblies whose informational version is `{SemVer}+{ShortSha}`, and `obj/gitversion.json` exists.
 - [x] **ci:** Add `.github/workflows/build.yml` as described in **Files**. A pull request run builds, prints the GitVersion `SemVer`, runs the full test suite (including the Testcontainers tests) and uploads the `trx` results.
 - [x] **docs-reference:** Write `docs/reference/` (`api.md`, `harness-options.md`, `failure-messages.md`, `compatibility.md`) from the finished code and XML comments. Every public member and every failure in the harness appears exactly once, in the layout described in **Documentation**.
 - [x] **docs-how-to:** Write the seven `docs/how-to/` guides, each with its code blocks backed by a `DocSamples/` test that passes.
-- [x] **docs-tutorial:** Write `docs/tutorials/first-scenario.md`, backed by `DocSamples/` tests, and walk through it from a clean clone to confirm every step and expected output is right.
+- [x] **docs-tutorial:** Write `docs/tutorials/first-scenario.md`, backed by `DocSamples/` tests, and walk through it from a clean clone to confirm every step and expected output is right. Done as: every code block and the shown failure message are asserted by `FirstScenarioSamples`, which passed from a fresh local clone and in CI's clean checkout. Nobody has followed it by hand as a new reader yet.
 - [x] **docs-explanation:** Write the five `docs/explanation/` pages, moving the reasoning from this design review into them.
 - [x] **docs-entry:** Write `docs/index.md` and replace `README.md` (what it is, a 10-line example, links into `docs/`, `just build` / `just test`). Run the compass check over every page and fix anything in the wrong section.
 - [x] **verify:** Run `just build` and `just test` until both are green with no warnings (requires Docker for Testcontainers), then push and confirm the `build.yml` run is green.
