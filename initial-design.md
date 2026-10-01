@@ -72,10 +72,10 @@ flowchart LR
     Builder -->|records steps| Steps["List of IScenarioStep"]
     Steps -->|RunAsync| Exec[ScenarioRunner]
     Exec --> Given["GivenStream: StartStream + SaveChanges"]
-    Exec --> When["When: host.InvokeMessageAndWaitAsync"]
+    Exec --> When["When: host.ExecuteAndWaitAsync (tenant-aware invoke)"]
     Exec --> CatchUp["ProjectionSync: CatchUp / WaitForNonStale / None"]
     Exec --> Then["Then: FetchStreamAsync / tracked session asserts"]
-    Exec --> Query["WhenQuery: IMessageBus.InvokeAsync of TResponse"]
+    Exec --> Query["WhenQuery: IMessageBus.InvokeAsync / InvokeForTenantAsync of TResponse"]
 ```
 
 - **Deferred execution:** each fluent call adds a step to a list. `RunAsync()` (or awaiting the builder through `GetAwaiter`) runs the steps in order. This lets the builder chain synchronously, as in your sketch.
@@ -90,13 +90,17 @@ flowchart LR
   - `TrackingTimeout`
   - `IncludeExternalMessages` (Wolverine tracking)
 - **Stream identity:** overloads for both `Guid` and `string` stream ids, which covers Marten's two `StreamIdentity` modes. Both have plain and `<TAggregate>` forms.
-- **Multi-tenancy:** an optional `ForTenant(tenantId)` on the builder. It opens sessions with `LightweightSession(tenantId)` and invokes Wolverine with that tenant id. If it isn't used, sessions use the default tenant.
+- **Multi-tenancy:** one tenant per scenario. `Setup` returns `IScenarioStart`, which adds `ForTenant(tenantId)` on top of `IGivenStage`. `ForTenant` returns a plain `IGivenStage`, so it can only be called once, straight after `Setup` and before any Given. If it isn't called, the scenario uses Marten's default tenant. When a tenant is set, every step uses it:
+  - Givens and all Then reads open sessions with `LightweightSession(tenantId)`;
+  - `When` runs `host.ExecuteAndWaitAsync(c => c.InvokeForTenantAsync(tenantId, command))` under tracking;
+  - `WhenQuery` runs `bus.InvokeForTenantAsync<TResponse>(tenantId, query)`.
+  - Without a tenant, `When` runs `host.ExecuteAndWaitAsync(c => c.InvokeAsync(command))` and `WhenQuery` runs `bus.InvokeAsync<TResponse>(query)`. Both paths share one code path that only differs in the invoke call.
 - **Givens:**
   - `GivenStream(Guid id, Func<Guid, object[]> events)` and `GivenStream<TAggregate>(...)` call `session.Events.StartStream`.
   - Each Given is a separate `SaveChangesAsync`.
   - After the Givens, the harness runs the configured projection sync step (see **Projection sync** below). It makes no assumption about which projections exist or how the host runs them.
 - **When:**
-  - `When(Func<object> command)` runs `host.InvokeMessageAndWaitAsync(command)`, which is Wolverine tracking. It keeps the `ITrackedSession` and then runs the configured projection sync step.
+  - `When(Func<object> command)` invokes the command under Wolverine tracking with `host.ExecuteAndWaitAsync(...)` (tenant-aware, see **Multi-tenancy**). It keeps the `ITrackedSession` and then runs the configured projection sync step.
   - If the command throws, the harness captures the exception for `ThenThrows<T>` instead of failing straight away.
 - **Captured exceptions (When and WhenQuery alike):**
   - Both `When` and `WhenQuery` capture an exception thrown by the *handler* instead of failing straight away.
@@ -153,7 +157,7 @@ Each method returns the interface for the next stage, so IntelliSense offers onl
 ```csharp
 namespace CritterStack.TestHarness;
 
-// TestHarness.Setup(host, o => ...) returns IGivenStage.
+// TestHarness.Setup(host, o => ...) returns IScenarioStart.
 
 public interface IScenario
 {
@@ -161,10 +165,14 @@ public interface IScenario
     TaskAwaiter GetAwaiter();
 }
 
-public interface IGivenStage
+// Only available straight after Setup, so the tenant is set once for the whole scenario.
+public interface IScenarioStart : IGivenStage
 {
     IGivenStage ForTenant(string tenantId);
+}
 
+public interface IGivenStage
+{
     IGivenStage GivenStream(Guid id, Func<Guid, object[]> events);
     IGivenStage GivenStream(string id, Func<string, object[]> events);
     IGivenStage GivenStream<TAggregate>(Guid id, Func<Guid, object[]> events) where TAggregate : class;
@@ -213,8 +221,11 @@ public interface IQueryStage<TResponse> : IThenStage<IQueryStage<TResponse>>
 
 ```mermaid
 stateDiagram-v2
-    [*] --> IGivenStage: Setup
-    IGivenStage --> IGivenStage: GivenStream / ForTenant
+    [*] --> IScenarioStart: Setup
+    IScenarioStart --> IGivenStage: ForTenant / GivenStream
+    IScenarioStart --> ICommandStage: When
+    IScenarioStart --> IQueryStage: WhenQuery
+    IGivenStage --> IGivenStage: GivenStream
     IGivenStage --> ICommandStage: When
     IGivenStage --> IQueryStage: WhenQuery
     ICommandStage --> ICommandStage: ThenAppended / ThenStream / ThenThrows / ThenPublished
@@ -244,8 +255,8 @@ Harness library:
 - `src/CritterStack.TestHarness/CritterStack.TestHarness.csproj`: references Alba, Marten and WolverineFx with central versions. The csproj stays self-contained (no `ProjectReference`, no custom build imports), so a consuming service can copy the project and only needs those three packages in its own central versions.
 - `TestHarness.cs`: static `Setup` entry point.
 - `HarnessOptions.cs`
-- `Stages/`: `IScenario.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
-- `ScenarioBuilder.cs` (internal): implements `IGivenStage` and `ICommandStage`, and records the steps.
+- `Stages/`: `IScenario.cs`, `IScenarioStart.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
+- `ScenarioBuilder.cs` (internal): implements `IScenarioStart`, `IGivenStage` and `ICommandStage`, records the steps and holds the scenario's tenant id.
 - `QueryStage.cs` (internal): `QueryStage<TResponse>`, created per `WhenQuery` call. It implements `IQueryStage<TResponse>` and forwards to the owning `ScenarioBuilder`.
 - `Steps/`: `GivenStreamStep`, `WhenCommandStep`, `WhenQueryStep`, `StreamAssertionStep`, `AppendedAssertionStep`, `ThrowsAssertionStep`, `PublishedAssertionStep`, `ResultAssertionStep`.
 - `ScenarioContext.cs`: holds the host, tracked session, last exception, last query result and the stream-version snapshots taken before the most recent `When`.
@@ -261,10 +272,13 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message), `FailWidget` (whose handler throws `WidgetException`) and `StallWidget` (whose handler waits longer than a short test `TrackingTimeout`, to prove timeouts can't be claimed);
   - a query `GetWidgetById` plus its handler, which throws `WidgetNotFoundException` for an unknown id;
   - one inline read model and one async read model, `WidgetSummary`.
-- `Infrastructure/HarnessHostFixture.cs`: starts a Postgres Testcontainer, then `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. It registers no daemon, so `CatchUp` is proven against a host that has none. A second fixture variant with `AddAsyncDaemon(Solo)` covers `WaitForNonStale`.
+- `Infrastructure/HarnessHostFixture.cs`: starts a Postgres Testcontainer, then `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. The event store uses conjoined tenancy (`Events.TenancyStyle = TenancyStyle.Conjoined`) and Wolverine's Marten integration routes invokes by tenant id, so `ForTenant` can be tested; scenarios without `ForTenant` run on the default tenant. It registers no daemon, so `CatchUp` is proven against a host that has none. A second fixture variant with `AddAsyncDaemon(Solo)` covers `WaitForNonStale`.
 - `Infrastructure/HarnessCollection.cs`: an xUnit collection fixture.
 - `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
   - a Given creates the stream, for both `Guid` and `string` ids;
+  - `ForTenant("a")` Givens, `When` and `ThenAppended` all run as tenant `a`, and the command handler's session sees tenant `a`;
+  - a stream given under tenant `a` is not visible to a scenario that uses `ForTenant("b")` (`ThenStreamEventCount(id, 0)`);
+  - `WhenQuery` under `ForTenant` returns that tenant's read model;
   - steps run only on `RunAsync` or `await`;
   - a failed `ThenStreamHasEvent` throws `ScenarioAssertionException` whose message includes each actual event's version, type name and JSON payload;
   - a failed `ThenResult` includes the response as JSON in its message;
@@ -294,5 +308,5 @@ Every test gets a `business_value` trait that states what the test protects.
 
 ## Risks / verify during implementation
 
-- I will confirm these Marten 9.23 and Wolverine 6.26 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `InvokeMessageAndWaitAsync`, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
+- I will confirm these Marten 9.23 and Wolverine 6.26 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
