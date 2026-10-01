@@ -103,9 +103,12 @@ flowchart LR
     - On an append, the `<TAggregate>` type argument is ignored, because the stream's aggregate type was set when it started. A mismatched `<TAggregate>` on a later Given is not an error.
     - The first Given for an id always starts a new stream. If that id already exists in the database (for example, an id reused across tests), Marten's collision error fails the scenario at once as an infrastructure failure. Tests should use a fresh id each time.
   - Each Given is a separate `SaveChangesAsync`.
-  - After the Givens, the harness runs the configured projection sync step (see **Projection sync** below). It makes no assumption about which projections exist or how the host runs them.
+- **Projection sync:** the harness runs the configured `ProjectionSync` step right *before* each `When` and each `WhenQuery`, so that both a query handler and a command handler that happens to read a projection see up-to-date data. It makes no assumption about which projections exist or how the host runs them.
+  - The runner keeps a "dirty" flag that is set by every Given and every `When`. A sync before a `When` or `WhenQuery` only runs if the flag is set, and clears it. So `WhenQuery` → `WhenQuery` syncs once, and a scenario that starts with `WhenQuery` and has no Givens doesn't sync at all.
+  - There is no sync after the last step or before a `Then`. Stream assertions read events directly, and `ThenPublished` reads the tracked session, so neither needs projections. To assert on a read model after a `When`, follow it with a `WhenQuery`, which syncs first.
+  - A sync that exceeds `ProjectionTimeout` is an infrastructure failure (see **Captured exceptions**).
 - **When:**
-  - `When(Func<object> command)` invokes the command under Wolverine tracking with `host.ExecuteAndWaitAsync(...)` (tenant-aware, see **Multi-tenancy**). It keeps the `ITrackedSession` and then runs the configured projection sync step.
+  - `When(Func<object> command)` runs projection sync if needed, then invokes the command under Wolverine tracking with `host.ExecuteAndWaitAsync(...)` (tenant-aware, see **Multi-tenancy**). It keeps the `ITrackedSession` for `ThenPublished`.
   - If the command throws, the harness captures the exception for `ThenThrows<T>` instead of failing straight away.
 - **Captured exceptions (When and WhenQuery alike):**
   - Both `When` and `WhenQuery` capture an exception thrown by the *handler* instead of failing straight away.
@@ -142,9 +145,9 @@ flowchart LR
   - Givens are allowed only before the first `When` or `WhenQuery`.
   - Whole-stream assertions need a `When` or a `WhenQuery` before them. Appended-event assertions need a `When`, because a query appends nothing.
   - `ThenThrows` exists after a `When` or a `WhenQuery`. `ThenPublished` exists only after a `When`, because a query invoke has no tracked session.
-  - Projection sync runs after the last Given whether a `When` follows or a `WhenQuery` does.
+  - Projection sync runs before each `When` and `WhenQuery` when anything has been written since the last sync (see **Projection sync**).
   - `ThenThrows`, `ThenResult`, `ThenPublished` and the appended-event assertions refer to the most recent `When` or `WhenQuery` before them. Whole-stream assertions always see the whole stream as it is when they run.
-- **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs `IMessageBus.InvokeAsync<TResponse>` and stores the typed response. `ThenResult(Func<TResponse, bool>)` asserts on it with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
+- **Queries:** `WhenQuery<TResponse>(Func<object> query)` runs projection sync if needed, then runs `IMessageBus.InvokeAsync<TResponse>` (or `InvokeForTenantAsync`) and stores the typed response. Queries are not tracked, so anything a query handler cascades is not waited for. `ThenResult(Func<TResponse, bool>)` asserts on the response with no runtime cast. Queries run through Wolverine, not HTTP; the HTTP contract stays in the endpoint tests.
 - **Failures:** the harness throws `ScenarioAssertionException`. The message names the failing step, then shows what was actually there so a failed predicate is easy to diagnose:
   - stream assertions list each relevant event (the whole stream, or only the appended events for `ThenAppended*`) with its version, type name and JSON payload;
   - `ThenResult` shows the query response as JSON;
@@ -266,7 +269,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 - `TestDomain/`: a minimal domain that exercises every harness feature without depending on any service:
   - an aggregate, `Widget`;
   - events `WidgetCreated`, `WidgetRenamed` and `WidgetPublished`;
-  - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message), `FailWidget` (whose handler throws `WidgetException`) and `StallWidget` (whose handler waits longer than a short test `TrackingTimeout`, to prove timeouts can't be claimed);
+  - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message), `FailWidget` (whose handler throws `WidgetException`), `StallWidget` (whose handler waits longer than a short test `TrackingTimeout`, to prove timeouts can't be claimed) and `ArchiveWidget` (whose handler loads the async `WidgetSummary` read model and throws if it is missing, to prove the sync before a `When`);
   - a query `GetWidgetById` plus its handler, which throws `WidgetNotFoundException` for an unknown id;
   - one inline read model and one async read model, `WidgetSummary`.
 - `Infrastructure/PostgresContainerFixture.cs`: an xUnit v3 assembly fixture (`[assembly: AssemblyFixture(typeof(PostgresContainerFixture))]`) that starts one Postgres Testcontainer for the whole test assembly and exposes its connection string.
@@ -291,6 +294,9 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - a `When` with no registered handler fails at once and cannot be claimed;
   - `ThenPublished` sees the cascaded message;
   - in `CatchUp` mode, `WhenQuery`/`ThenResult` reads the async read model;
+  - `When` → `WhenQuery` sees the read model updated by the command's events (sync before the query);
+  - a `When` whose handler reads the async read model sees data from the Givens (sync before the command);
+  - `WhenQuery` → `WhenQuery` with nothing written in between syncs only once (verified by counting sync calls through an internal hook);
   - `ProjectionSync.None` leaves the async read model stale;
   - `WaitForNonStale` works against a host that runs a daemon;
   - a Given followed by `WhenQuery` and `ThenResult`, with no command, works;
