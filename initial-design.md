@@ -71,7 +71,7 @@ flowchart LR
     Setup["TestHarness.Setup(host, options)"] --> Builder[ScenarioBuilder]
     Builder -->|records steps| Steps["List of IScenarioStep"]
     Steps -->|RunAsync| Exec[ScenarioRunner]
-    Exec --> Given["GivenStream: StartStream + SaveChanges"]
+    Exec --> Given["GivenStream: StartStream or Append + SaveChanges"]
     Exec --> When["When: host.ExecuteAndWaitAsync (tenant-aware invoke)"]
     Exec --> CatchUp["ProjectionSync: CatchUp / WaitForNonStale / None"]
     Exec --> Then["Then: FetchStreamAsync / tracked session asserts"]
@@ -97,7 +97,11 @@ flowchart LR
   - `WhenQuery` runs `bus.InvokeForTenantAsync<TResponse>(tenantId, query)`.
   - Without a tenant, `When` runs `host.ExecuteAndWaitAsync(c => c.InvokeAsync(command))` and `WhenQuery` runs `bus.InvokeAsync<TResponse>(query)`. Both paths share one code path that only differs in the invoke call.
 - **Givens:**
-  - `GivenStream(Guid id, Func<Guid, object[]> events)` and `GivenStream<TAggregate>(...)` call `session.Events.StartStream`.
+  - `GivenStream(Guid id, Func<Guid, object[]> events)` and `GivenStream<TAggregate>(...)` write events to a stream. The scenario remembers which stream ids its Givens have already started:
+    - the first `GivenStream` for an id calls `session.Events.StartStream` (`StartStream<TAggregate>` for the generic form);
+    - later `GivenStream` calls for the same id call `session.Events.Append`, so a stream's history can be built up over several Givens.
+    - On an append, the `<TAggregate>` type argument is ignored, because the stream's aggregate type was set when it started. A mismatched `<TAggregate>` on a later Given is not an error.
+    - The first Given for an id always starts a new stream. If that id already exists in the database (for example, an id reused across tests), Marten's collision error fails the scenario at once as an infrastructure failure. Tests should use a fresh id each time.
   - Each Given is a separate `SaveChangesAsync`.
   - After the Givens, the harness runs the configured projection sync step (see **Projection sync** below). It makes no assumption about which projections exist or how the host runs them.
 - **When:**
@@ -272,6 +276,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 - `Infrastructure/Collections.cs`: two xUnit collection definitions, `NoDaemonCollection` (uses `NoDaemonHostFixture`) and `DaemonCollection` (uses `DaemonHostFixture`). The collections run in parallel with each other; tests inside one collection run one after another.
 - `TestHarnessTests.cs`, `ProjectionSyncTests.cs`, `StepOrderingTests.cs` and `AssertionMessageTests.cs`, which together cover:
   - a Given creates the stream, in both its plain and `<TAggregate>` forms;
+  - two `GivenStream` calls with the same id build one stream (start, then append), and `ThenStreamEventCount` sees all of their events;
   - `ForTenant("a")` Givens, `When` and `ThenAppended` all run as tenant `a`, and the command handler's session sees tenant `a`;
   - a stream given under tenant `a` is not visible to a scenario that uses `ForTenant("b")` (`ThenStreamEventCount(id, 0)`);
   - `WhenQuery` under `ForTenant` returns that tenant's read model;
