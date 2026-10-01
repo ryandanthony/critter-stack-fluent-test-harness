@@ -257,7 +257,21 @@ Repo scaffolding:
 
   All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies.
 - `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` and `FestinaLente.CodeStandards` (both `PrivateAssets="all"`) on every project, `stylecop.json` added as an `AdditionalFiles` item, and xunit v3 and the test SDK added to every `*.Tests` project. `GenerateDocumentationFile` is on for non-test projects, so with warnings as errors a missing XML doc comment on any public member (CS1591) fails the build.
-- `src/Directory.Build.targets`: copied from awen. It removes the `stylecop.json` that ships inside the CodeStandards package so only the repo's copy is used. This has to be a `.targets` file, because NuGet package props are imported after `Directory.Build.props`.
+- `src/Directory.Build.targets`: copied verbatim from awen. It removes the `stylecop.json` that ships inside the CodeStandards package so only the repo's copy is used. This has to be a `.targets` file, because NuGet package props are imported after `Directory.Build.props`:
+
+  ```xml
+  <Project>
+    <!-- Remove the NuGet package's stylecop.json, keeping only the repo-root copy.
+         This must be in .targets (not .props) because NuGet package props are imported after Directory.Build.props. -->
+    <Target Name="DeduplicateStylecopJson" BeforeTargets="CoreCompile">
+      <ItemGroup>
+        <AdditionalFiles Remove="%(Identity)" Condition="'%(Filename)%(Extension)' == 'stylecop.json' and '%(Identity)' != '$(MSBuildThisFileDirectory)stylecop.json'" />
+      </ItemGroup>
+    </Target>
+  </Project>
+  ```
+
+  It keeps only the `stylecop.json` in its own folder (`$(MSBuildThisFileDirectory)`), so `Directory.Build.props`, `Directory.Build.targets` and `stylecop.json` must all stay together in `src/`. Moving one of them silently drops the repo's StyleCop settings.
 - `src/stylecop.json`: copied from awen (company name, copyright header, documentation and ordering rules), so analyzer settings match across repos.
 - `GitVersion.yml` (repo root): copied from `ryandanthony/awen` so versioning works the same way across repos:
   - `mode: ContinuousDelivery`, `tag-prefix: v`, strategies `Mainline` and `TaggedCommit`;
