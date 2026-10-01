@@ -225,6 +225,21 @@ Repo scaffolding:
 
 - `src/CritterStack.TestHarness.slnx`: solution file containing the harness and its test project.
 - `global.json` (repo root): pins the .NET 10 SDK (`10.0.302`, `rollForward: latestFeature`).
+- `nuget.config` (repo root): copied from awen. It clears the default sources, then adds nuget.org and the festina-lente-io GitHub Packages feed, and maps `FestinaLente.*` to the GitHub feed and everything else to nuget.org:
+
+  ```xml
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+    <add key="github" value="https://nuget.pkg.github.com/festina-lente-io/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+    <packageSource key="github"><package pattern="FestinaLente.*" /></packageSource>
+  </packageSourceMapping>
+  ```
+
+  GitHub Packages needs authentication even for reads. Locally, restore needs a GitHub token with `read:packages` stored for the `github` source (`dotnet nuget update source github --username <user> --password <token> --store-password-in-clear-text`); CI uses `GITHUB_TOKEN`.
 - `src/Directory.Packages.props`: central package versions, pinned to the latest stable releases (as of 2026-10-01):
 
   | Package | Version |
@@ -238,9 +253,12 @@ Repo scaffolding:
   | xunit.runner.visualstudio | 4.0.0 |
   | Microsoft.NET.Test.Sdk | 18.10.1 |
   | GitVersion.MsBuild | 6.8.2 |
+  | FestinaLente.CodeStandards | 1.1.10 |
 
   All of them ship `net10.0` builds. `WolverineFx.Marten` 6.44.0 requires Marten ≥ 9.41.0, which 9.44.0 satisfies.
-- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` (`PrivateAssets="all"`) on every project, and xunit v3 and the test SDK added to every `*.Tests` project. `GenerateDocumentationFile` is on for non-test projects, so with warnings as errors a missing XML doc comment on any public member (CS1591) fails the build.
+- `src/Directory.Build.props`: `TargetFramework` `net10.0`, `Nullable` enabled, `ImplicitUsings` enabled, `TreatWarningsAsErrors` on, `IncludeSourceRevisionInInformationalVersion` false, `GitVersion.MsBuild` and `FestinaLente.CodeStandards` (both `PrivateAssets="all"`) on every project, `stylecop.json` added as an `AdditionalFiles` item, and xunit v3 and the test SDK added to every `*.Tests` project. `GenerateDocumentationFile` is on for non-test projects, so with warnings as errors a missing XML doc comment on any public member (CS1591) fails the build.
+- `src/Directory.Build.targets`: copied from awen. It removes the `stylecop.json` that ships inside the CodeStandards package so only the repo's copy is used. This has to be a `.targets` file, because NuGet package props are imported after `Directory.Build.props`.
+- `src/stylecop.json`: copied from awen (company name, copyright header, documentation and ordering rules), so analyzer settings match across repos.
 - `GitVersion.yml` (repo root): copied from `ryandanthony/awen` so versioning works the same way across repos:
   - `mode: ContinuousDelivery`, `tag-prefix: v`, strategies `Mainline` and `TaggedCommit`;
   - assembly version `MajorMinor`, file version `MajorMinorPatch`, informational version `{SemVer}+{ShortSha}`;
@@ -252,16 +270,17 @@ Repo scaffolding:
   1. `actions/checkout@v4` with `fetch-depth: 0` (GitVersion needs the full history and tags);
   2. `actions/setup-dotnet@v4` (SDK from `global.json`);
   3. `actions/cache@v4` for `~/.nuget/packages`, keyed on the csproj and props files;
-  4. install `just` (`extractions/setup-just`);
-  5. `just build`;
-  6. extract the version from `src/CritterStack.TestHarness/obj/gitversion.json` (`SemVer` and `MajorMinorPatch`) into step outputs and the job summary;
-  7. `just test`;
-  8. upload the `*.trx` files as a workflow artifact (`actions/upload-artifact@v4`, `if: always()`), so failed runs keep their results.
+  4. configure the `github` NuGet source with `GITHUB_TOKEN` (`dotnet nuget update source github --username github --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text`), with the workflow granted `packages: read`;
+  5. install `just` (`extractions/setup-just`);
+  6. `just build`;
+  7. extract the version from `src/CritterStack.TestHarness/obj/gitversion.json` (`SemVer` and `MajorMinorPatch`) into step outputs and the job summary;
+  8. `just test`;
+  9. upload the `*.trx` files as a workflow artifact (`actions/upload-artifact@v4`, `if: always()`), so failed runs keep their results.
   - No packing, tagging or publishing in v1. The extracted version is ready for a later release job (awen's `softprops/action-gh-release` and NuGet push steps are the model).
 
 Harness library:
 
-- `src/CritterStack.TestHarness/CritterStack.TestHarness.csproj`: references Alba, Marten and WolverineFx with central versions. The csproj stays self-contained (no `ProjectReference`, no custom build imports), so a consuming service can copy the project and only needs those three packages in its own central versions.
+- `src/CritterStack.TestHarness/CritterStack.TestHarness.csproj`: references Alba, Marten and WolverineFx with central versions. The csproj stays self-contained (no `ProjectReference`, no custom build imports), so a consuming service can copy the project and only needs those three packages in its own central versions. CodeStandards and GitVersion come from `Directory.Build.props`, not the csproj, so a consuming service doesn't inherit them (or the GitHub feed) when it copies the project.
 - `TestHarness.cs`: static `Setup` entry point.
 - `HarnessOptions.cs`
 - `Stages/`: `IScenario.cs`, `IScenarioStart.cs`, `IGivenStage.cs`, `IThenStage.cs`, `ICommandStage.cs` and `IQueryStage.cs`, one public interface per file.
@@ -328,6 +347,8 @@ Every test gets a `business_value` trait that states what the test protects.
 
 - I will confirm these Marten 9.44 and Wolverine 6.44 APIs with Context7 before relying on them: `ForceAllMartenDaemonActivityToCatchUpAsync`, `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on both `IMessageContext` and `IMessageBus`), conjoined event tenancy, and the `ITrackedSession` shape. If catch-up is missing, the fallback is `store.BuildProjectionDaemonAsync()` then `CatchUpAsync`.
 - The harness tests' own host disables external transports, so tracking stays fast and predictable there. Consuming services whose hosts run real transports (for example Service Bus or Kafka emulators) may need `IncludeExternalMessages` or a longer `TrackingTimeout` for cascaded messages.
+- `FestinaLente.CodeStandards` brings in analyzers (StyleCop and others) that, with warnings as errors, may flag code the design takes for granted, such as one public interface per file, file headers and member ordering. The first build after `scaffold` shows how strict it is. Fix the code to comply, and only suppress a rule in `.editorconfig` with a one-line reason.
+- Restore fails without a GitHub token for the `github` source, both locally and in CI.
 
 ## Documentation
 
@@ -393,7 +414,7 @@ In build order. Each item lists what "done" means.
   - the exception types for each infrastructure failure (wrong `TResponse`, tracking timeout, no handler, sync timeout, stream id collision) and how a handler exception surfaces from tracking (direct or wrapped in `AggregateException`);
   - Alba 8.5.3 works with Wolverine 6.44 tracking on a `net10.0` host.
   - Update the design (pinned versions, API names, the **Risks** section) wherever something differs.
-- [ ] **scaffold:** Add `global.json` (.NET 10 SDK), `src/Directory.Packages.props` (the pinned versions in **Files**), `src/Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings as errors, xunit v3 and the test SDK for `*.Tests`), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `just build` succeeds on an empty solution.
+- [ ] **scaffold:** Add `global.json` (.NET 10 SDK), `nuget.config` (nuget.org plus the festina-lente-io GitHub feed, with source mapping), `src/Directory.Packages.props` (the pinned versions in **Files**), `src/Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings as errors, CodeStandards, xunit v3 and the test SDK for `*.Tests`), `src/Directory.Build.targets` and `src/stylecop.json` (both from awen), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `FestinaLente.CodeStandards` restores from the GitHub feed, and `just build` succeeds on an empty solution.
 - [ ] **project:** Create both projects and add them to the slnx:
   - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
   - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten and Testcontainers.PostgreSql).
