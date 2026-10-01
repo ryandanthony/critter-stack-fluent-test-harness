@@ -99,7 +99,13 @@ flowchart LR
   - `When(Func<object> command)` runs `host.InvokeMessageAndWaitAsync(command)`, which is Wolverine tracking. It keeps the `ITrackedSession` and then runs the configured projection sync step.
   - If the command throws, the harness captures the exception for `ThenThrows<T>` instead of failing straight away.
 - **Captured exceptions (When and WhenQuery alike):**
-  - Both `When` and `WhenQuery` capture a thrown exception instead of failing straight away.
+  - Both `When` and `WhenQuery` capture an exception thrown by the *handler* instead of failing straight away.
+  - Only handler exceptions can be claimed. Harness and infrastructure failures are test setup bugs, not behaviour under test, so they fail the scenario at once with a `ScenarioAssertionException` that names the step:
+    - `WhenQuery<TResponse>` where the handler's response isn't a `TResponse`;
+    - a Wolverine tracking timeout on `When` (`TrackingTimeout` exceeded);
+    - no handler registered for the command or query;
+    - projection sync timing out (`ProjectionTimeout` exceeded).
+  - The runner tells the two apart by where the exception comes from: anything thrown out of the handler pipeline (including an `AggregateException` from tracking that wraps handler exceptions) is captured. The specific Wolverine and Marten exception types for the four infrastructure cases above are confirmed during the `verify-apis` step and listed in one internal classifier.
   - `ThenThrows<T>` checks the most recent captured exception. Its type has to match `T` (including subclasses), or an `AggregateException` from tracking has to wrap one, and the optional predicate has to pass.
   - If an exception isn't claimed by a `ThenThrows` before the next `When` or `WhenQuery` (or before the end of the scenario), it fails the scenario as an unexpected exception. The failure message gives the exception type and the step name.
   - `ThenResult` after a query that threw fails with "query threw `<type>`" rather than a null-reference error.
@@ -240,7 +246,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 - `TestDomain/`: a minimal domain that exercises every harness feature without depending on any service:
   - an aggregate, `Widget`;
   - events `WidgetCreated`, `WidgetRenamed` and `WidgetPublished`;
-  - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message) and `FailWidget` (whose handler throws `WidgetException`);
+  - commands `RenameWidget`, `PublishWidget` (which cascades a `WidgetPublishedNotice` message), `FailWidget` (whose handler throws `WidgetException`) and `StallWidget` (whose handler waits longer than a short test `TrackingTimeout`, to prove timeouts can't be claimed);
   - a query `GetWidgetById` plus its handler, which throws `WidgetNotFoundException` for an unknown id;
   - one inline read model and one async read model, `WidgetSummary`.
 - `Infrastructure/HarnessHostFixture.cs`: starts a Postgres Testcontainer, then `AlbaHost.For(WebApplication.CreateBuilder())`. On that host it runs `AddMarten(...).IntegrateWithWolverine()` with the test projections, plus Wolverine with `DisableAllExternalWolverineTransports()`. It registers no daemon, so `CatchUp` is proven against a host that has none. A second fixture variant with `AddAsyncDaemon(Solo)` covers `WaitForNonStale`.
@@ -253,6 +259,8 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - after two `When`s, `ThenAppended` and `ThenAppendedCount` see only the second command's events;
   - `ThenAppended` works on a stream that the `When` itself creates (snapshot version 0);
   - `ThenThrows` captures a handler exception;
+  - a tracking timeout fails the scenario at once as a `ScenarioAssertionException` naming the `When` step, and `ThenThrows<TimeoutException>()` cannot claim it;
+  - a `When` with no registered handler fails at once and cannot be claimed;
   - `ThenPublished` sees the cascaded message;
   - in `CatchUp` mode, `WhenQuery`/`ThenResult` reads the async read model;
   - `ProjectionSync.None` leaves the async read model stale;
