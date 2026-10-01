@@ -107,8 +107,13 @@ flowchart LR
     - projection sync timing out (`ProjectionTimeout` exceeded).
   - The runner tells the two apart by where the exception comes from: anything thrown out of the handler pipeline (including an `AggregateException` from tracking that wraps handler exceptions) is captured. The specific Wolverine and Marten exception types for the four infrastructure cases above are confirmed during the `verify-apis` step and listed in one internal classifier.
   - `ThenThrows<T>` checks the most recent captured exception. Its type has to match `T` (including subclasses), or an `AggregateException` from tracking has to wrap one, and the optional predicate has to pass.
-  - If an exception isn't claimed by a `ThenThrows` before the next `When` or `WhenQuery` (or before the end of the scenario), it fails the scenario as an unexpected exception. The failure message gives the exception type and the step name, and the original exception is attached as `InnerException`.
-  - `ThenResult` after a query that threw fails with "query threw `<type>`" rather than a null-reference error.
+  - An unclaimed exception fails the scenario at the first point where it could hide the real cause: the first `Then` after the throwing step that isn't a `ThenThrows`, or the next `When`/`WhenQuery`, or the end of the scenario, whichever comes first. That step doesn't run its own check. It reports "`<step>` threw `<type>`" with the original exception attached as `InnerException`. So when you expect an exception, put `ThenThrows` first:
+    ```csharp
+    .When(() => new FailWidget(id))
+    .ThenThrows<WidgetException>()        // claims it
+    .ThenNotAppended<WidgetRenamed>(id)   // now runs normally
+    ```
+  - Once claimed, the exception no longer blocks later `Then`s. `ThenResult` after a claimed query exception still fails, with "query threw `<type>`, no result" rather than a null-reference error.
   - `ThenThrows` after a `When` or `WhenQuery` that didn't throw fails with "expected `<type>`, nothing thrown".
   - Every `ScenarioAssertionException` caused by an exception (unclaimed handler exceptions and the infrastructure failures above) keeps the original as `InnerException`, so its message and stack trace show up in test output. This is deliberate: the harness only runs in tests, so being able to debug a failure matters more than hiding exception text. The harness's own message still leads with the step name and exception type so the cause is obvious at a glance.
 - **Thens:**
@@ -274,6 +279,8 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
   - a scenario that chains `When`, then `WhenQuery`, then `When`, then `WhenQuery` keeps the full step history, and each `Then` checks the right result;
   - `WhenQuery` for an unknown widget, then `ThenThrows<WidgetNotFoundException>()`, passes;
   - a `When` or `WhenQuery` that throws with no `ThenThrows` after it fails the scenario as an unexpected exception;
+  - a `When` that throws, followed by `ThenAppended` and then `ThenThrows`, fails at `ThenAppended` with "`When` threw `<type>`" (not "no event appended"), and the handler exception is the `InnerException`;
+  - `ThenThrows` followed by `ThenNotAppended` passes when the handler threw and appended nothing;
   - `ThenResult` after a query that threw fails with a clear message;
   - `ThenThrows` when nothing was thrown fails;
   - `WhenQuery<TResponse>` with the wrong response type surfaces as a `ScenarioAssertionException` that names the step and keeps Wolverine's exception as `InnerException`;
