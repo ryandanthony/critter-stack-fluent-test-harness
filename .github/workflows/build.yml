@@ -1,0 +1,73 @@
+name: Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Full history: GitVersion needs every commit and tag.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # SDK version comes from global.json.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'src/Directory.*.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      # FestinaLente.CodeStandards comes from the festina-lente-io GitHub Packages feed, which needs auth even to read.
+      - name: Configure GitHub Packages credentials
+        run: |
+          dotnet nuget update source github \
+            --username github \
+            --password ${{ secrets.GITHUB_TOKEN }} \
+            --store-password-in-clear-text \
+            --configfile nuget.config
+
+      - name: Setup just
+        uses: extractions/setup-just@v3
+
+      - name: Build
+        run: just build
+
+      - name: Extract version
+        id: version
+        run: |
+          SEMVER=$(jq -r '.SemVer' src/CritterStack.TestHarness/obj/gitversion.json)
+          MAJORMINORPATCH=$(jq -r '.MajorMinorPatch' src/CritterStack.TestHarness/obj/gitversion.json)
+          echo "semVer=$SEMVER" >> "$GITHUB_OUTPUT"
+          echo "majorMinorPatch=$MAJORMINORPATCH" >> "$GITHUB_OUTPUT"
+          echo "### Version: \`$SEMVER\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # ubuntu-latest has Docker, so the Testcontainers Postgres tests run as-is.
+      - name: Test
+        run: just test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
