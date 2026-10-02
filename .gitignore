@@ -58,3 +58,5 @@ nunit-*.xml
 
 # Test results
 TestResults/
+src/.idea/*
+src/.codex/config.toml

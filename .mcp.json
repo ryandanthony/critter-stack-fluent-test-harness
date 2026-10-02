@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "rider": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "mcp-remote@latest", "http://127.0.0.1:64482/stream", "--transport", "http-only", "--host", "127.0.0.1"]
-    }
-  }
-}
