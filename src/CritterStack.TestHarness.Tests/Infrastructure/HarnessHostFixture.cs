@@ -10,6 +10,7 @@ using JasperFx.Events.Projections;
 using JasperFx.MultiTenancy;
 using Marten;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Wolverine;
 using Wolverine.Marten;
@@ -57,6 +58,10 @@ public abstract class HarnessHostFixture : IAsyncLifetime
     {
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
+
+        // Validate scopes in every environment, not just Development, so resolving a scoped service (such as
+        // IMessageBus) from the root provider fails here the same way it does under an IDE's test runner.
+        builder.Host.UseDefaultServiceProvider(o => o.ValidateScopes = true);
 
         var marten = builder.Services.AddMarten(options =>
             {

@@ -48,7 +48,11 @@ internal sealed class WhenQueryStep<TResponse> : IActionStep
 
         await ProjectionSyncRunner.SyncIfDirtyAsync(context, cancellationToken).ConfigureAwait(false);
 
-        var bus = context.Host.Services.GetRequiredService<IMessageBus>();
+        // IMessageBus is scoped. Resolving it from the root provider throws when the host validates scopes, which
+        // .NET turns on in the Development environment (the default under an IDE's test runner).
+        var scope = context.Host.Services.CreateAsyncScope();
+        await using var scopeDisposal = scope.ConfigureAwait(false);
+        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
         object? result;
         try
         {
