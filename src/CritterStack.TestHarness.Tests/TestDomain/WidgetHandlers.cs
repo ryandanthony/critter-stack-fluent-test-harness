@@ -117,4 +117,15 @@ public static class WidgetHandlers
         ArgumentNullException.ThrowIfNull(session);
         return session.LoadAsync<WidgetSummary>(query.Id);
     }
+
+    /// <summary>Waits for the requested delay, honouring cancellation, then returns null.</summary>
+    /// <param name="query">The query.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    /// <returns>Always null.</returns>
+    public static async Task<WidgetSummary?> Handle(SlowFindWidget query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        await Task.Delay(query.Delay, cancellationToken).ConfigureAwait(false);
+        return null;
+    }
 }

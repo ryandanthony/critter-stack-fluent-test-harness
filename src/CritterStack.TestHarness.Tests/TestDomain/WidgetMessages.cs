@@ -61,3 +61,7 @@ public sealed record GetWidgetById(Guid Id);
 /// <summary>Returns a <see cref="WidgetSummary"/> or null, never throws.</summary>
 /// <param name="Id">The widget id.</param>
 public sealed record FindWidget(Guid Id);
+
+/// <summary>A query whose handler waits for the delay, honouring cancellation, then returns null.</summary>
+/// <param name="Delay">How long the handler waits.</param>
+public sealed record SlowFindWidget(TimeSpan Delay);
