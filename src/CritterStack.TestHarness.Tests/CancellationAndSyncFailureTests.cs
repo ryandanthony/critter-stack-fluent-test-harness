@@ -76,9 +76,14 @@ public sealed class CancellationAndSyncFailureTests(NoDaemonHostFixture fixture)
         Assert.IsAssignableFrom<OperationCanceledException>(ex);
     }
 
+    /// <remarks>
+    /// No step follows the action: a later step would let the runner's own cancellation check throw first, which
+    /// would hide a step that wrongly recorded the cancellation as the handler's exception.
+    /// </remarks>
+    /// <returns>A task.</returns>
     [Fact]
-    [Trait("business_value", "Cancellation during a When surfaces as a cancellation and can't be claimed as the handler's exception.")]
-    public async Task Cancellation_during_a_when_is_not_claimable()
+    [Trait("business_value", "Cancellation during a When surfaces as a cancellation, not as an unclaimed handler exception.")]
+    public async Task Cancellation_during_a_when_is_not_a_handler_exception()
     {
         var id = Guid.NewGuid();
         using var cts = new CancellationTokenSource();
@@ -89,22 +94,24 @@ public sealed class CancellationAndSyncFailureTests(NoDaemonHostFixture fixture)
                 cts.Cancel();
                 return new RenameWidget(id, "Gear");
             })
-            .ThenThrows<OperationCanceledException>()
             .RunAsync(cts.Token));
 
         Assert.IsAssignableFrom<OperationCanceledException>(ex);
     }
 
+    /// <remarks>
+    /// No step follows the action, for the same reason as the When test above.
+    /// </remarks>
+    /// <returns>A task.</returns>
     [Fact]
-    [Trait("business_value", "Cancellation while a WhenQuery handler runs surfaces as a cancellation and can't be claimed as the handler's exception.")]
-    public async Task Cancellation_during_a_query_is_not_claimable()
+    [Trait("business_value", "Cancellation while a WhenQuery handler runs surfaces as a cancellation, not as an unclaimed handler exception.")]
+    public async Task Cancellation_during_a_query_is_not_a_handler_exception()
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cts.CancelAfter(TimeSpan.FromMilliseconds(200));
 
         var ex = await Record.ExceptionAsync(() => TestHarness.Setup(fixture.Host, o => o.ProjectionSync = ProjectionSync.None)
             .WhenQuery<WidgetSummary?>(() => new SlowFindWidget(TimeSpan.FromSeconds(30)))
-            .ThenThrows<OperationCanceledException>()
             .RunAsync(cts.Token));
 
         Assert.IsAssignableFrom<OperationCanceledException>(ex);
