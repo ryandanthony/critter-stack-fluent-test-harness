@@ -47,6 +47,28 @@ public sealed class InternalGuardTests(NoDaemonHostFixture fixture)
     }
 
     [Fact]
+    [Trait("business_value", "Starting an action clears everything the previous action left behind, so no assertion can read a stale result, snapshot, session or exception.")]
+    public void BeginAction_clears_the_previous_actions_state()
+    {
+        var context = new ScenarioContext(fixture.Host, new HarnessOptions(), tenantId: null)
+        {
+            ActionException = new InvalidOperationException("old"),
+            ActionExceptionClaimed = true,
+            QueryResult = "old result",
+        };
+        context.Snapshots[Guid.NewGuid()] = 3;
+
+        context.BeginAction("step 4 When(RenameWidget)");
+
+        Assert.Equal("step 4 When(RenameWidget)", context.ActionLabel);
+        Assert.Null(context.ActionException);
+        Assert.False(context.ActionExceptionClaimed);
+        Assert.Null(context.TrackedSession);
+        Assert.Null(context.QueryResult);
+        Assert.Empty(context.Snapshots);
+    }
+
+    [Fact]
     [Trait("business_value", "If the runner ever forgets to snapshot a stream before a When, the appended-event assertion says it's a harness bug rather than reporting wrong events.")]
     public async Task Appended_assertion_without_a_snapshot_reports_a_harness_bug()
     {

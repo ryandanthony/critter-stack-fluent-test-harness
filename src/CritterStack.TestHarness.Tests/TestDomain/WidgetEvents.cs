@@ -32,3 +32,7 @@ public sealed record WidgetArchived(Guid Id);
 /// <param name="Id">The widget id.</param>
 /// <param name="TenantId">The session's tenant id.</param>
 public sealed record TenantRecorded(Guid Id, string TenantId);
+
+/// <summary>Makes <see cref="PoisonProjection"/> throw.</summary>
+/// <param name="Id">The widget id.</param>
+public sealed record WidgetPoisoned(Guid Id);

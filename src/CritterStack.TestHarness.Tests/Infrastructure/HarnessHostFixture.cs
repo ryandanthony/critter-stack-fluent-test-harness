@@ -53,6 +53,14 @@ public abstract class HarnessHostFixture : IAsyncLifetime
     /// <value>True to register <c>AddAsyncDaemon(Solo)</c>.</value>
     protected abstract bool RunDaemon { get; }
 
+    /// <summary>
+    /// Adds host-specific Marten configuration, such as an extra projection, after the shared setup.
+    /// </summary>
+    /// <param name="options">The Marten options.</param>
+    protected virtual void ConfigureMarten(StoreOptions options)
+    {
+    }
+
     /// <inheritdoc/>
     public async ValueTask InitializeAsync()
     {
@@ -72,6 +80,7 @@ public abstract class HarnessHostFixture : IAsyncLifetime
                 options.Policies.AllDocumentsAreMultiTenanted();
                 options.Projections.Add<WidgetDetailsProjection>(ProjectionLifecycle.Inline);
                 options.Projections.Add<WidgetSummaryProjection>(ProjectionLifecycle.Async);
+                ConfigureMarten(options);
             })
             .IntegrateWithWolverine(integration => integration.MessageStorageSchemaName = SchemaName + "_wolverine");
 
