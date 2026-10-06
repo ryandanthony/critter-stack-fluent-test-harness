@@ -134,4 +134,12 @@ public static class WidgetHandlers
     /// <returns>Never returns.</returns>
     public static WidgetSummary Handle(TimeOutWidgetQuery query) =>
         throw new TimeoutException($"widget {query?.Id} read model timed out");
+
+    /// <summary>Throws a handler timeout that looks like Wolverine's tracking-timeout wrapper.</summary>
+    /// <param name="query">The query.</param>
+    /// <returns>Never returns.</returns>
+    public static WidgetSummary Handle(WrapperShapedTimeoutQuery query) =>
+        throw new TimeoutException(
+            $"This TrackedSession timed out for widget {query?.Id}",
+            new TimeoutException("read model store timed out"));
 }

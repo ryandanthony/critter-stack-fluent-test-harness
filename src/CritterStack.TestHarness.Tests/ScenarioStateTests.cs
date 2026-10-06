@@ -215,6 +215,16 @@ public sealed class ScenarioStateTests(NoDaemonHostFixture fixture)
     }
 
     [Fact]
+    [Trait("business_value", "Queries aren't tracked, so a query handler's exception is never mistaken for a tracking timeout, whatever it looks like.")]
+    public async Task Query_exception_shaped_like_a_tracking_timeout_stays_claimable()
+    {
+        await TestHarness.Setup(fixture.Host, o => o.TrackingTimeout = TimeSpan.FromMilliseconds(1))
+            .WhenQuery<WidgetSummary>(() => new WrapperShapedTimeoutQuery(Guid.NewGuid()))
+            .ThenThrows<TimeoutException>(e => e.Message.StartsWith("This TrackedSession timed out", StringComparison.Ordinal))
+            .RunAsync(Ct);
+    }
+
+    [Fact]
     [Trait("business_value", "A cascaded failure can be claimed as the AggregateException itself, for tests that care about every inner failure.")]
     public async Task ThenThrows_can_claim_the_aggregate_itself()
     {

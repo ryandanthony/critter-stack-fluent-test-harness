@@ -69,3 +69,10 @@ public sealed record SlowFindWidget(TimeSpan Delay);
 /// <summary>A query whose handler throws a <see cref="TimeoutException"/> of its own.</summary>
 /// <param name="Id">The widget id.</param>
 public sealed record TimeOutWidgetQuery(Guid Id);
+
+/// <summary>
+/// A query whose handler throws a <see cref="TimeoutException"/> shaped exactly like Wolverine's tracking-timeout
+/// wrapper: the same message prefix, with an inner <see cref="TimeoutException"/>.
+/// </summary>
+/// <param name="Id">The widget id.</param>
+public sealed record WrapperShapedTimeoutQuery(Guid Id);
