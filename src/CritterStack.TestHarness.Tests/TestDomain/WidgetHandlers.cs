@@ -128,4 +128,10 @@ public static class WidgetHandlers
         await Task.Delay(query.Delay, cancellationToken).ConfigureAwait(false);
         return null;
     }
+
+    /// <summary>Throws a handler-owned timeout.</summary>
+    /// <param name="query">The query.</param>
+    /// <returns>Never returns.</returns>
+    public static WidgetSummary Handle(TimeOutWidgetQuery query) =>
+        throw new TimeoutException($"widget {query?.Id} read model timed out");
 }

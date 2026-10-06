@@ -110,4 +110,55 @@ public sealed class InternalGuardTests(NoDaemonHostFixture fixture)
         Assert.Same(handler, ExceptionClassifier.HandlerException(wrapped));
         Assert.Same(handler, ExceptionClassifier.HandlerException(handler));
     }
+
+    [Fact]
+    [Trait("business_value", "Only Wolverine's own tracking wrapper counts as a tracking timeout; a late handler TimeoutException with another shape stays claimable.")]
+    public void Only_the_tracking_wrapper_shape_is_a_tracking_timeout()
+    {
+        var tracking = TimeSpan.FromSeconds(10);
+        var late = TimeSpan.FromSeconds(11);
+        var handlerOwn = new TimeoutException("This TrackedSession timed out but was thrown by a handler");
+        var otherMessage = new TimeoutException("supplier timed out", new TimeoutException("inner"));
+        var otherInner = new TimeoutException("This TrackedSession timed out", new InvalidOperationException("inner"));
+
+        Assert.Null(ExceptionClassifier.InfrastructureReason(handlerOwn, typeof(string), tracking, late));
+        Assert.Null(ExceptionClassifier.InfrastructureReason(otherMessage, typeof(string), tracking, late));
+        Assert.Null(ExceptionClassifier.InfrastructureReason(otherInner, typeof(string), tracking, late));
+        Assert.Same(otherMessage, ExceptionClassifier.HandlerException(otherMessage));
+        Assert.Same(otherInner, ExceptionClassifier.HandlerException(otherInner));
+    }
+
+    [Fact]
+    [Trait("business_value", "Nested generic types are named readably at every level, e.g. Dictionary<String, List<Int32>>.")]
+    public void TypeName_names_nested_generic_arguments()
+    {
+        Assert.Equal("Dictionary<String, List<Int32>>", Failure.TypeName(typeof(Dictionary<string, List<int>>)));
+        Assert.Equal("Widget", Failure.TypeName(typeof(TestDomain.Widget)));
+    }
+
+    [Fact]
+    [Trait("business_value", "When IncludeExternalMessages is set, the When really asks Wolverine to track external transports.")]
+    public async Task IncludeExternalMessages_turns_on_external_tracking()
+    {
+        var on = await RunPublishAsync(includeExternal: true);
+        var off = await RunPublishAsync(includeExternal: false);
+
+        Assert.True(AlwaysTrackExternalTransports(on));
+        Assert.False(AlwaysTrackExternalTransports(off));
+    }
+
+    private static bool AlwaysTrackExternalTransports(object trackedSession) =>
+        (bool)trackedSession.GetType().GetProperty("AlwaysTrackExternalTransports")!.GetValue(trackedSession)!;
+
+    private async Task<object> RunPublishAsync(bool includeExternal)
+    {
+        var id = Guid.NewGuid();
+        var start = TestHarness.Setup(fixture.Host, o => o.IncludeExternalMessages = includeExternal);
+        await start
+            .When(() => new TestDomain.PublishWidget(id))
+            .ThenPublished<TestDomain.WidgetPublishedNotice>()
+            .RunAsync(Ct);
+
+        return ((ScenarioBuilder)start).LastContext!.TrackedSession!;
+    }
 }

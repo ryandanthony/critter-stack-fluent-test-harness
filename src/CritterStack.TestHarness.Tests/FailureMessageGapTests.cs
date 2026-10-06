@@ -19,6 +19,36 @@ namespace CritterStack.TestHarness.Tests;
 public sealed class FailureMessageGapTests(NoDaemonHostFixture fixture)
 {
     [Fact]
+    [Trait("business_value", "A failure listing several events shows one per line, oldest first, with nothing trailing after the last.")]
+    public async Task Failed_stream_assertion_lists_each_event_on_its_own_line()
+    {
+        var id = Guid.NewGuid();
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .GivenStream<Widget>(id, i => [new WidgetCreated(i, "Sprocket"), new WidgetRenamed(i, "Gear")])
+            .WhenQuery<WidgetSummary?>(() => new FindWidget(id))
+            .ThenStreamHasEvent<WidgetPublished>(id));
+
+        var lines = failure.Message.Split(Environment.NewLine);
+        Assert.Equal("Actual events:", lines[^3]);
+        Assert.StartsWith("  v1 WidgetCreated {", lines[^2], StringComparison.Ordinal);
+        Assert.StartsWith("  v2 WidgetRenamed {", lines[^1], StringComparison.Ordinal);
+        Assert.EndsWith("}", lines[^1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("business_value", "A wrong appended count on a stream the command created says 'found 0' or the right number, never counting from before the stream existed.")]
+    public async Task ThenAppendedCount_on_a_new_stream_counts_from_its_first_event()
+    {
+        var id = Guid.NewGuid();
+        var failure = await FailsAsync(TestHarness.Setup(fixture.Host)
+            .When(() => new RenameWidget(id, "Fresh"))
+            .ThenAppendedCount(id, 2));
+
+        Assert.Contains("expected 2 event(s) appended by step 1 When(RenameWidget), found 1", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("v1 WidgetRenamed {", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("business_value", "A wrong whole-stream event count says what was expected, what was found, and lists the events.")]
     public async Task ThenStreamEventCount_mismatch_reports_expected_and_actual()
     {

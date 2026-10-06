@@ -150,6 +150,23 @@ public sealed class ScenarioStateTests(NoDaemonHostFixture fixture)
     }
 
     [Fact]
+    [Trait("business_value", "Whole-stream assertions after a When don't depend on a snapshot, so they work on streams no appended-event assertion mentions.")]
+    public async Task Whole_stream_assertions_after_a_when_need_no_snapshot()
+    {
+        var id = Guid.NewGuid();
+        var start = TestHarness.Setup(fixture.Host);
+
+        await start
+            .GivenStream<Widget>(id, i => [new WidgetCreated(i, "Sprocket")])
+            .When(() => new RenameWidget(id, "Gear"))
+            .ThenStreamHasEvent<WidgetRenamed>(id)
+            .ThenStreamEventCount(id, 2)
+            .RunAsync(Ct);
+
+        Assert.Empty(((Internal.ScenarioBuilder)start).LastContext!.Snapshots);
+    }
+
+    [Fact]
     [Trait("business_value", "A scenario can be run again; appended-event assertions measure from the stream's version at each run, not the first.")]
     public async Task Rerunning_a_scenario_takes_fresh_snapshots()
     {
@@ -174,6 +191,26 @@ public sealed class ScenarioStateTests(NoDaemonHostFixture fixture)
         await TestHarness.Setup(fixture.Host)
             .When(() => new FailWidget(Guid.NewGuid()))
             .ThenThrows<Exception>(e => e is WidgetException)
+            .RunAsync(Ct);
+    }
+
+    [Fact]
+    [Trait("business_value", "A query handler's own TimeoutException is behaviour under test and can be claimed, like a command's.")]
+    public async Task Query_handler_timeout_exception_is_claimable()
+    {
+        await TestHarness.Setup(fixture.Host)
+            .WhenQuery<WidgetSummary>(() => new TimeOutWidgetQuery(Guid.NewGuid()))
+            .ThenThrows<TimeoutException>(e => e.Message.Contains("read model", StringComparison.Ordinal))
+            .RunAsync(Ct);
+    }
+
+    [Fact]
+    [Trait("business_value", "A null response reaches ThenResult as default(TResponse), even for a value type, instead of crashing.")]
+    public async Task Null_response_is_default_for_a_value_type()
+    {
+        await TestHarness.Setup(fixture.Host)
+            .WhenQuery<int>(() => new FindWidget(Guid.NewGuid()))
+            .ThenResult(r => r == 0)
             .RunAsync(Ct);
     }
 

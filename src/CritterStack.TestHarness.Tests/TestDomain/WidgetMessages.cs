@@ -65,3 +65,7 @@ public sealed record FindWidget(Guid Id);
 /// <summary>A query whose handler waits for the delay, honouring cancellation, then returns null.</summary>
 /// <param name="Delay">How long the handler waits.</param>
 public sealed record SlowFindWidget(TimeSpan Delay);
+
+/// <summary>A query whose handler throws a <see cref="TimeoutException"/> of its own.</summary>
+/// <param name="Id">The widget id.</param>
+public sealed record TimeOutWidgetQuery(Guid Id);
