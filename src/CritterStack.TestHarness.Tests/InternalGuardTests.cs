@@ -69,6 +69,27 @@ public sealed class InternalGuardTests(NoDaemonHostFixture fixture)
     }
 
     [Fact]
+    [Trait("business_value", "Snapshot planning ties an appended-event check only to the When directly before it, never to a When before an intervening query.")]
+    public async Task Snapshot_planning_stops_at_a_query()
+    {
+        var id = Guid.NewGuid();
+        var command = new WhenCommandStep(() => new TestDomain.RenameWidget(id, "Gear"));
+
+        // The public API can't put an appended check after a query; building the steps directly can, to prove the plan.
+        IScenarioStep[] steps =
+        [
+            command,
+            new WhenQueryStep<TestDomain.WidgetSummary?>(() => new TestDomain.FindWidget(id)),
+            StreamAssertionStep.ForCount(id, StreamScope.Appended, 0),
+        ];
+
+        await Assert.ThrowsAsync<HarnessAssertionException>(
+            () => ScenarioRunner.RunAsync(steps, fixture.Host, new HarnessOptions(), tenantId: null, Ct));
+
+        Assert.Empty(command.SnapshotIds);
+    }
+
+    [Fact]
     [Trait("business_value", "If the runner ever forgets to snapshot a stream before a When, the appended-event assertion says it's a harness bug rather than reporting wrong events.")]
     public async Task Appended_assertion_without_a_snapshot_reports_a_harness_bug()
     {
