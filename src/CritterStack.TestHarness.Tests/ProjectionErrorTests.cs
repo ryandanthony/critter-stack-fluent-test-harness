@@ -17,6 +17,9 @@ namespace CritterStack.TestHarness.Tests;
 /// <remarks>
 /// Keep this to one test. Once the daemon reports a projection's error, it stops that projection, and later
 /// catch-ups on the same host skip it without reporting anything. A second test here would depend on test order.
+/// Don't register <see cref="PoisonProjection"/> on another host in the same test run either: with two hosts
+/// catching up a failing projection in one process, the error was reported on only one of them, and this test
+/// failed about one run in five. A plain Marten catch-up, with no harness code, behaved the same way.
 /// </remarks>
 /// <param name="fixture">The host fixture.</param>
 [Collection(nameof(PoisonDaemonCollection))]
