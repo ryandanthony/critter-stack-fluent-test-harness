@@ -54,18 +54,24 @@ internal static class ScenarioRunner
     }
 
     /// <summary>
-    /// Tells each <c>When</c> which streams the appended-event assertions after it will read, so it can snapshot
-    /// their versions before invoking the command.
+    /// Tells each <c>When</c> and <c>WhenHttp</c> which streams the appended-event assertions after it will read, so it
+    /// can snapshot their versions before running, and tells each <c>WhenHttp</c> whether a <c>ThenStatusCode</c>
+    /// follows it.
     /// </summary>
     private static void PlanSnapshots(IReadOnlyList<IScenarioStep> steps)
     {
-        WhenCommandStep? current = null;
+        ISnapshottingStep? current = null;
         foreach (var step in steps)
         {
-            if (step is WhenCommandStep command)
+            if (step is ISnapshottingStep snapshotting)
             {
-                command.SnapshotIds.Clear();
-                current = command;
+                snapshotting.SnapshotIds.Clear();
+                if (snapshotting is WhenHttpStep http)
+                {
+                    http.StatusAsserted = false;
+                }
+
+                current = snapshotting;
             }
             else if (step is IActionStep)
             {
@@ -75,9 +81,13 @@ internal static class ScenarioRunner
             {
                 current.SnapshotIds.Add(appended.StreamId);
             }
+            else if (current is WhenHttpStep http && step is StatusCodeAssertionStep)
+            {
+                http.StatusAsserted = true;
+            }
             else
             {
-                // Givens and other Thens need no snapshot.
+                // Givens and other Thens need no planning.
             }
         }
     }

@@ -26,6 +26,11 @@ These are test setup problems. They fail the scenario at the step where they hap
 | A factory threw | `building the events/command/query threw <type>` | the factory's exception |
 | A factory returned null | `the command/query factory returned null` | none |
 | A predicate threw | `the predicate threw <type>` | the predicate's exception |
+| `WhenHttp` on a host that isn't an Alba host | `WhenHttp needs an Alba host (IAlbaHost), but Setup was given <Type>` | none |
+| `WhenHttp` under `ForTenant` without `HttpTenant` | `the scenario has ForTenant but HarnessOptions.HttpTenant is not set, so the request can't carry the tenant. ...` | none |
+| `WhenHttp` request configuration threw | `configuring the request threw <type>` | the exception |
+| `WhenHttp` tracking timed out | `Wolverine tracking timed out after <TrackingTimeout> (TrackingTimeout) waiting for the request and the messages it cascaded` | `TimeoutException` |
+| `WhenHttp` got an unexpected status | `expected a 2xx status, got <n>. To expect it, put ThenStatusCode(<n>) after this step.`, followed by the body | none |
 
 ## Handler exceptions
 
@@ -54,5 +59,10 @@ If nothing follows the action, the step is `end of scenario`. The `InnerExceptio
 | `ThenThrows`, nothing thrown | `expected <T>, but <action> threw nothing` | none |
 | `ThenThrows`, wrong type | `expected <T>, but <action> threw <type>` | none |
 | `ThenThrows`, predicate false | `<action> threw <T>, but it did not match the predicate` | none |
+| `ThenStatusCode` | `expected status <n> from <action>, got <m>` | the response body |
+| `ThenResponse` | `the body of <action> did not match the predicate` | the response body |
+| `ThenResponse`, unreadable body | `the body of <action> could not be read as <TBody>: <type>` | the response body |
+| `ThenResponse`, empty body | `<action> answered <status> with an empty body, so there is no <TBody> to check` | none |
+| `ThenStatusCode` or `ThenResponse` after a throw | `<action> threw <type>, so there is no response` | none |
 
 Events are listed as `v<version> <Type> <json>`; messages as `<Type> <json>`.

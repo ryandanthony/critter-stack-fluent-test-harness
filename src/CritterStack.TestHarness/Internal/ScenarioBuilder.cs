@@ -12,8 +12,9 @@ using Microsoft.Extensions.Hosting;
 namespace CritterStack.TestHarness.Internal;
 
 /// <summary>
-/// Records a scenario's steps. Implements the start, Given and command stages; each <c>WhenQuery</c> returns a
-/// <see cref="QueryStage{TResponse}"/> that forwards back here, so the whole scenario shares one step list.
+/// Records a scenario's steps. Implements the start, Given and command stages; each <c>WhenQuery</c> and
+/// <c>WhenHttp</c> returns a <see cref="QueryStage{TResponse}"/> or <see cref="HttpStage"/> that forwards back here,
+/// so the whole scenario shares one step list.
 /// </summary>
 internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
 {
@@ -84,6 +85,14 @@ internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
         ArgumentNullException.ThrowIfNull(query);
         _steps.Add(new WhenQueryStep<TResponse>(query));
         return new QueryStage<TResponse>(this);
+    }
+
+    /// <inheritdoc/>
+    public IHttpStage WhenHttp(Action<Alba.Scenario> request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        _steps.Add(new WhenHttpStep(request));
+        return new HttpStage(this);
     }
 
     /// <inheritdoc/>

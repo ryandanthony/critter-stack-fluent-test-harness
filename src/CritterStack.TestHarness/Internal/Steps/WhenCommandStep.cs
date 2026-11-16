@@ -13,7 +13,7 @@ namespace CritterStack.TestHarness.Internal.Steps;
 /// Invokes a command under Wolverine tracking, after syncing projections and snapshotting the versions of the
 /// streams that later appended-event assertions read.
 /// </summary>
-internal sealed class WhenCommandStep : IActionStep
+internal sealed class WhenCommandStep : ISnapshottingStep
 {
     private readonly Func<object> _command;
     private string? _commandName;
@@ -27,11 +27,8 @@ internal sealed class WhenCommandStep : IActionStep
         _command = command;
     }
 
-    /// <summary>
-    /// Gets the stream ids to snapshot before invoking, filled in by the runner from the assertions that follow.
-    /// </summary>
-    /// <value>The stream ids.</value>
-    internal HashSet<Guid> SnapshotIds { get; } = [];
+    /// <inheritdoc/>
+    public HashSet<Guid> SnapshotIds { get; } = [];
 
     /// <inheritdoc/>
     public StepKind Kind => StepKind.Action;
@@ -48,7 +45,7 @@ internal sealed class WhenCommandStep : IActionStep
         context.BeginAction(context.CurrentStepLabel);
 
         await ProjectionSyncRunner.SyncIfDirtyAsync(context, cancellationToken).ConfigureAwait(false);
-        await SnapshotAsync(context, cancellationToken).ConfigureAwait(false);
+        await StreamSnapshots.TakeAsync(context, SnapshotIds, cancellationToken).ConfigureAwait(false);
 
         var tracking = context.Host.TrackActivity(context.Options.TrackingTimeout);
         if (context.Options.IncludeExternalMessages)
@@ -83,21 +80,6 @@ internal sealed class WhenCommandStep : IActionStep
         finally
         {
             context.ProjectionsDirty = true;
-        }
-    }
-
-    private async Task SnapshotAsync(ScenarioContext context, CancellationToken cancellationToken)
-    {
-        if (SnapshotIds.Count == 0)
-        {
-            return;
-        }
-
-        await using var session = context.OpenQuerySession();
-        foreach (var id in SnapshotIds)
-        {
-            var state = await session.Events.FetchStreamStateAsync(id, cancellationToken).ConfigureAwait(false);
-            context.Snapshots[id] = state?.Version ?? 0;
         }
     }
 }

@@ -13,6 +13,7 @@
     <PackageVersion Include="WolverineFx" Version="6.44.0" />
     <PackageVersion Include="WolverineFx.Marten" Version="6.44.0" />
     <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.44.0" />
+    <PackageVersion Include="WolverineFx.Http" Version="6.44.0" />
     <PackageVersion Include="Alba" Version="8.5.3" />
   </ItemGroup>
 

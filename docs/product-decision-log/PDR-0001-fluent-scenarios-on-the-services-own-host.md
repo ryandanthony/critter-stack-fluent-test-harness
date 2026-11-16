@@ -1,6 +1,6 @@
 # PDR-0001: Fluent Given/When/Then scenarios on the service's own test host
 
-- **Status:** accepted
+- **Status:** accepted (the HTTP non-goal is superseded by [PDR-0011](./PDR-0011-scenarios-can-test-http-endpoints.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Target API, Design), now [design/01-harness-design.md](../design/01-harness-design.md)

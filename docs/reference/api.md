@@ -9,14 +9,16 @@ Every public type and method in `CritterStack.TestHarness`, in the order a scena
 | (none) | `TestHarness.Setup(host, configure?)` | `IScenarioStart` |
 | `IScenarioStart` | `ForTenant(tenantId)` | `IGivenStage` |
 | `IScenarioStart`, `IGivenStage` | `GivenStream(id, events)`, `GivenStream<TAggregate>(id, events)` | `IGivenStage` |
-| `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>` | `When(command)` | `ICommandStage` |
-| `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>` | `WhenQuery<TResponse>(query)` | `IQueryStage<TResponse>` |
-| `ICommandStage`, `IQueryStage<T>` | `ThenStreamHasEvent`, `ThenStreamHasNoEvent`, `ThenStreamEventCount`, `ThenThrows` | same stage |
-| `ICommandStage` | `ThenAppended`, `ThenNotAppended`, `ThenAppendedCount`, `ThenPublished` | `ICommandStage` |
+| `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `When(command)` | `ICommandStage` |
+| `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `WhenQuery<TResponse>(query)` | `IQueryStage<TResponse>` |
+| `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `WhenHttp(request)` | `IHttpStage` |
+| `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `ThenStreamHasEvent`, `ThenStreamHasNoEvent`, `ThenStreamEventCount`, `ThenThrows` | same stage |
+| `ICommandStage`, `IHttpStage` | `ThenAppended`, `ThenNotAppended`, `ThenAppendedCount`, `ThenPublished` | same stage |
 | `IQueryStage<T>` | `ThenResult` | `IQueryStage<T>` |
-| `ICommandStage`, `IQueryStage<T>` | `RunAsync(ct)`, `await` | (runs the scenario) |
+| `IHttpStage` | `ThenStatusCode`, `ThenResponse<TBody>` | `IHttpStage` |
+| `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `RunAsync(ct)`, `await` | (runs the scenario) |
 
-Calls that aren't in this table don't compile. For example, a Given after a `When`, `ThenAppended` after a `WhenQuery`, or awaiting a scenario with no `When` or `WhenQuery`.
+Calls that aren't in this table don't compile. For example, a Given after a `When`, `ThenAppended` after a `WhenQuery`, or awaiting a scenario with no `When`, `WhenQuery` or `WhenHttp`.
 
 Nothing runs until `RunAsync` is called or the scenario is awaited.
 
@@ -35,7 +37,7 @@ Everything on `IGivenStage`, plus:
 ### `ForTenant(string tenantId)`
 
 - **Returns:** `IGivenStage` (so it can only be called once, before any Given).
-- **Does:** runs every step as `tenantId`. Givens and Then reads use `LightweightSession(tenantId)`, `When` uses `InvokeForTenantAsync`, `WhenQuery` uses `InvokeForTenantAsync<T>`. Without it, the scenario uses Marten's default tenant.
+- **Does:** runs every step as `tenantId`. Givens and Then reads use `LightweightSession(tenantId)`, `When` uses `InvokeForTenantAsync`, `WhenQuery` uses `InvokeForTenantAsync<T>`, and `WhenHttp` applies `HarnessOptions.HttpTenant` to the request. Without it, the scenario uses Marten's default tenant.
 - **Fails:** `ArgumentException` if `tenantId` is null or white space.
 
 ## `IGivenStage`
@@ -60,7 +62,14 @@ Everything on `IGivenStage`, plus:
 - **Does:** syncs projections if needed, invokes the query with `InvokeAsync<object>` (or `InvokeForTenantAsync<object>`), and stores the response. A `null` response is stored as `default(TResponse)`. A handler exception is captured for `ThenThrows`.
 - **Fails (at once, not claimable):** the factory throws or returns null; no handler is registered; projection sync fails; the handler returns a non-null value that isn't a `TResponse`.
 
-## `IThenStage<TSelf>` (on both `ICommandStage` and `IQueryStage<T>`)
+### `WhenHttp(Action<Alba.Scenario> request)`
+
+- **Returns:** `IHttpStage`.
+- **Does:** syncs projections if needed; snapshots the streams a later `ThenAppended*` on this stage reads; sends the request through the host's Alba pipeline (`IAlbaHost.Scenario`) under Wolverine tracking, so cascaded messages are waited for and recorded. Under `ForTenant`, applies `HarnessOptions.HttpTenant` after `request`. Alba's own status check is turned off and the response is kept for `ThenStatusCode` and `ThenResponse`. An exception thrown by the endpoint is captured for `ThenThrows`.
+- **Status rule:** without a `ThenStatusCode` before the next action, a status outside 200 to 299 fails at once. With one, any status is accepted here and `ThenStatusCode` decides.
+- **Fails (at once, not claimable):** the host isn't an `IAlbaHost`; `ForTenant` is set but `HttpTenant` isn't; `request` or `HttpTenant` throws; tracking times out; projection sync fails; an unexpected non-2xx status.
+
+## `IThenStage<TSelf>` (on `ICommandStage`, `IQueryStage<T>` and `IHttpStage`)
 
 Whole-stream assertions read the full stream with `FetchStreamAsync`, including events from Givens and earlier commands.
 
@@ -80,11 +89,11 @@ Whole-stream assertions read the full stream with `FetchStreamAsync`, including 
 
 ### `ThenThrows<TException>(Func<TException, bool>? predicate = null)`
 
-- **Passes when:** the most recent `When` or `WhenQuery` captured an exception that is a `TException` (or a subclass), or, for a cascaded handler's `AggregateException`, has a `TException` among its inner exceptions, and `predicate` (if any) returns true for that exception.
+- **Passes when:** the most recent `When`, `WhenQuery` or `WhenHttp` captured an exception that is a `TException` (or a subclass), or, for a cascaded handler's `AggregateException`, has a `TException` among its inner exceptions, and `predicate` (if any) returns true for that exception.
 - **Effect:** claims the exception, so later Thens run normally.
 - **Failure messages:** `expected TException, but <action> threw nothing`; `expected TException, but <action> threw <type>`; `<action> threw TException, but it did not match the predicate`.
 
-### `When(...)`, `WhenQuery<T>(...)`
+### `When(...)`, `WhenQuery<T>(...)`, `WhenHttp(...)`
 
 The same as on `IGivenStage`.
 
@@ -116,6 +125,21 @@ Appended-event assertions only see events the most recent `When` appended: the h
 
 - **Passes when:** `predicate` returns true for the most recent `WhenQuery`'s response (which may be `null`).
 - **Failure messages:** `the result of <action> did not match the predicate`, followed by the response as JSON; `<action> threw <type>, so there is no result`.
+
+## `IHttpStage`
+
+Everything on `IThenStage<IHttpStage>`, plus `ThenAppended`, `ThenNotAppended`, `ThenAppendedCount` and `ThenPublished`, which behave exactly as on `ICommandStage` but refer to the most recent `WhenHttp`.
+
+### `ThenStatusCode(int expected)`
+
+- **Passes when:** the most recent `WhenHttp`'s response status is `expected`.
+- **Effect:** lets that `WhenHttp` accept a non-2xx status.
+- **Failure messages:** `expected status <n> from <action>, got <m>`, followed by the response body; `<action> threw <type>, so there is no response`.
+
+### `ThenResponse<TBody>(Func<TBody, bool> predicate)`
+
+- **Passes when:** the body of the most recent `WhenHttp`'s response, read as JSON into `TBody` with the host's HTTP serializer (`IScenarioResult.ReadAsJsonAsync<TBody>`), makes `predicate` return true.
+- **Failure messages:** `the body of <action> did not match the predicate`, followed by the body; `the body of <action> could not be read as <TBody>: <type>`; `<action> answered <status> with an empty body, so there is no <TBody> to check`; `<action> threw <type>, so there is no response`.
 
 ## `IScenario`
 

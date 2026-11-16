@@ -1,6 +1,6 @@
 # ADR-0009: Commands run under Wolverine tracking, queries go straight through the bus
 
-- **Status:** accepted
+- **Status:** accepted (extended to `WhenHttp` by [ADR-0014](./ADR-0014-whenhttp-through-alba-under-tracking.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Multi-tenancy, When, Queries, `ThenPublished`), commit `b84d1af`

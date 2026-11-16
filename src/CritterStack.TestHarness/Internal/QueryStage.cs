@@ -59,6 +59,9 @@ internal sealed class QueryStage<TResponse> : IQueryStage<TResponse>
     public IQueryStage<TNext> WhenQuery<TNext>(Func<object> query) => _builder.WhenQuery<TNext>(query);
 
     /// <inheritdoc/>
+    public IHttpStage WhenHttp(Action<Alba.Scenario> request) => _builder.WhenHttp(request);
+
+    /// <inheritdoc/>
     public Task RunAsync(CancellationToken cancellationToken = default) => _builder.RunAsync(cancellationToken);
 
     /// <inheritdoc/>

@@ -41,4 +41,4 @@ await TestHarness
 
 `TResponse` must be the type the handler returns. If it returns something else, the scenario fails at the `WhenQuery` with `expected the handler to return <TResponse>, but it returned <Actual>`.
 
-Queries go through Wolverine, not HTTP. Test your HTTP endpoints with Alba directly.
+Queries go through Wolverine. To test the HTTP endpoint that serves a read model, use `WhenHttp` (see [test HTTP endpoints](test-http-endpoints.md)).

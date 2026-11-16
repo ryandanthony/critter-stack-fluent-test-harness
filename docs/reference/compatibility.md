@@ -14,6 +14,8 @@ Built and tested against:
 
 The harness library references Alba, Marten and WolverineFx only. A host running WolverineFx 6.44 in the default `TypeLoadMode.Dynamic` also needs `WolverineFx.RuntimeCompilation`; that is the host's dependency, not the harness's.
 
+`WhenHttp` works with any endpoint Alba can call. Its tests run against WolverineFx.Http 6.44.0 endpoints; the package does not depend on WolverineFx.Http.
+
 ## v1 limits
 
 | Not supported | What it would need |

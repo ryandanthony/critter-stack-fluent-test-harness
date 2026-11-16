@@ -55,4 +55,16 @@ public interface IGivenStage
     /// <returns>The query stage, whose Thens refer to this query.</returns>
     [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The response type is chosen by the caller; the query is untyped by design so it can't be inferred.")]
     IQueryStage<TResponse> WhenQuery<TResponse>(Func<object> query);
+
+    /// <summary>
+    /// Sends an HTTP request through the host's Alba pipeline under Wolverine message tracking, after running
+    /// projection sync if anything was written since the last sync. The response is kept for <c>ThenStatusCode</c> and
+    /// <c>ThenResponse</c>, and the tracked session for <c>ThenPublished</c>. An exception thrown by the endpoint is
+    /// captured for <c>ThenThrows</c>. Unless a <c>ThenStatusCode</c> follows, a non-2xx status fails at once.
+    /// Requires the host to be an <c>IAlbaHost</c>.
+    /// </summary>
+    /// <param name="request">Configures the Alba request, for example <c>x =&gt; x.Post.Json(body).ToUrl("/orders")</c>.
+    /// Called when the step runs. Assert the status with <c>ThenStatusCode</c>, not Alba's <c>StatusCodeShouldBe</c>.</param>
+    /// <returns>The HTTP stage, whose Thens refer to this request.</returns>
+    IHttpStage WhenHttp(Action<Alba.Scenario> request);
 }

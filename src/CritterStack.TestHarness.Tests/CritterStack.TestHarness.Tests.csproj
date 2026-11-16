@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="WolverineFx.Marten" />
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
+    <PackageReference Include="WolverineFx.Http" />
     <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
 

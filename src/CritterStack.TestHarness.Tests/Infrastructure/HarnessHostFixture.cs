@@ -10,9 +10,11 @@ using JasperFx.Events.Projections;
 using JasperFx.MultiTenancy;
 using Marten;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Wolverine;
+using Wolverine.Http;
 using Wolverine.Marten;
 
 namespace CritterStack.TestHarness.Tests.Infrastructure;
@@ -23,6 +25,12 @@ namespace CritterStack.TestHarness.Tests.Infrastructure;
 /// </summary>
 public abstract class HarnessHostFixture : IAsyncLifetime
 {
+    /// <summary>
+    /// Gets the request header Wolverine.Http reads the tenant id from on the test host.
+    /// </summary>
+    /// <value>The header name.</value>
+    public static string TenantHeader => "tenant";
+
     private readonly PostgresContainerFixture _postgres;
     private IAlbaHost? _host;
 
@@ -71,7 +79,33 @@ public abstract class HarnessHostFixture : IAsyncLifetime
         // IMessageBus) from the root provider fails here the same way it does under an IDE's test runner.
         builder.Host.UseDefaultServiceProvider(o => o.ValidateScopes = true);
 
-        var marten = builder.Services.AddMarten(options =>
+        AddMarten(builder.Services);
+        AddWolverine(builder);
+
+        _host = await AlbaHost.For(builder, MapEndpoints).ConfigureAwait(false);
+    }
+
+    private static void AddWolverine(WebApplicationBuilder builder)
+    {
+        builder.Services.DisableAllExternalWolverineTransports();
+        builder.Services.AddWolverineHttp();
+        builder.Host.UseWolverine(options =>
+        {
+            options.Policies.AutoApplyTransactions();
+            options.Discovery.IncludeType(typeof(WidgetHandlers));
+        });
+    }
+
+    private static void MapEndpoints(WebApplication app) =>
+        app.MapWolverineEndpoints(http =>
+        {
+            http.CustomizeHttpEndpointDiscovery(q => q.Includes.WithNameSuffix(nameof(WidgetEndpoints)));
+            http.TenantId.IsRequestHeaderValue(TenantHeader);
+        });
+
+    private void AddMarten(IServiceCollection services)
+    {
+        var marten = services.AddMarten(options =>
             {
                 options.Connection(_postgres.ConnectionString);
                 options.DatabaseSchemaName = SchemaName;
@@ -88,15 +122,6 @@ public abstract class HarnessHostFixture : IAsyncLifetime
         {
             marten.AddAsyncDaemon(JasperFx.Events.Daemon.DaemonMode.Solo);
         }
-
-        builder.Services.DisableAllExternalWolverineTransports();
-        builder.Host.UseWolverine(options =>
-        {
-            options.Policies.AutoApplyTransactions();
-            options.Discovery.IncludeType(typeof(WidgetHandlers));
-        });
-
-        _host = await AlbaHost.For(builder, _ => { }).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>

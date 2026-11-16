@@ -6,9 +6,11 @@ The choices behind the harness, and what v1 deliberately leaves out. Each one is
 
 The harness ships as the `CritterStack.TestHarness` NuGet package, which depends on Alba, Marten and WolverineFx and nothing else. It knows nothing about any service's aggregates, projections, schemas or transports. Everything that varies between services is a `HarnessOptions` field, so a service adds the package and uses it as is. An earlier version had services copy the project into their repo instead; copies drifted and upgrades didn't reach them, so it became a package.
 
-## Queries through Wolverine, not HTTP
+## Queries through Wolverine, requests through Alba
 
-`WhenQuery` invokes the query handler through Wolverine. HTTP concerns (routing, status codes, serialization) belong in endpoint tests, which Alba already does well. Keeping them apart means a scenario tests behaviour, not transport.
+`WhenQuery` invokes the query handler through Wolverine, so a scenario can test a read model without caring how it is served. `WhenHttp` covers the other half: the endpoint, its routing, status codes and JSON, through the same Alba pipeline the service already tests with. Both live in the harness so one scenario can mix them. A request runs under Wolverine tracking like a command, so its appended events and cascaded messages can be asserted the same way.
+
+The harness turns Alba's status check off and applies its own rule: a non-2xx fails at once unless a `ThenStatusCode` follows. That keeps the happy path short and makes error responses something a test states on purpose. The tenant isn't guessed: services read it from a header, a claim or the route, so a `ForTenant` scenario has to say how with `HttpTenant`, or fail.
 
 ## One tenant per scenario
 

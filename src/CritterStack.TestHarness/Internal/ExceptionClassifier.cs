@@ -41,13 +41,24 @@ internal static class ExceptionClassifier
             return $"no Wolverine handler is registered for {Failure.TypeName(messageType)}";
         }
 
-        if (IsTrackedSessionWrapper(exception) && elapsed >= trackingTimeout * TimeoutTolerance)
+        if (IsTrackingTimeout(exception, trackingTimeout, elapsed))
         {
             return $"Wolverine tracking timed out after {trackingTimeout} (TrackingTimeout) waiting for {Failure.TypeName(messageType)} and its cascaded messages";
         }
 
         return null;
     }
+
+    /// <summary>
+    /// Tells whether an exception is Wolverine's tracked-session timeout, as opposed to a handler's own
+    /// <see cref="TimeoutException"/> in the same wrapper.
+    /// </summary>
+    /// <param name="exception">The exception the tracked action threw.</param>
+    /// <param name="trackingTimeout">The tracking timeout in force.</param>
+    /// <param name="elapsed">How long the action ran before it threw.</param>
+    /// <returns>True for a real tracking timeout.</returns>
+    internal static bool IsTrackingTimeout(Exception exception, TimeSpan trackingTimeout, TimeSpan elapsed) =>
+        IsTrackedSessionWrapper(exception) && elapsed >= trackingTimeout * TimeoutTolerance;
 
     /// <summary>
     /// Gets the exception a <c>ThenThrows</c> should see for a handler exception. Wolverine's tracked session wraps

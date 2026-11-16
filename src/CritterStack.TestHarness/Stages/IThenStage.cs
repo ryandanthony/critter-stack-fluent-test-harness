@@ -70,4 +70,11 @@ public interface IThenStage<out TSelf> : IScenario
     /// <returns>The query stage, whose Thens refer to this query.</returns>
     [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The response type is chosen by the caller; the query is untyped by design so it can't be inferred.")]
     IQueryStage<TResponse> WhenQuery<TResponse>(Func<object> query);
+
+    /// <summary>
+    /// Sends another HTTP request. See <see cref="IGivenStage.WhenHttp"/>.
+    /// </summary>
+    /// <param name="request">Configures the Alba request. Called when the step runs.</param>
+    /// <returns>The HTTP stage, whose Thens refer to this request.</returns>
+    IHttpStage WhenHttp(Action<Alba.Scenario> request);
 }

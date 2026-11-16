@@ -81,7 +81,7 @@ internal sealed class ScenarioContext
         CurrentStepLabel = $"step {CurrentStepNumber} {step.Describe()}";
     }
 
-    /// <summary>Gets the label of the most recent <c>When</c> or <c>WhenQuery</c>.</summary>
+    /// <summary>Gets the label of the most recent <c>When</c>, <c>WhenQuery</c> or <c>WhenHttp</c>.</summary>
     /// <value>The action label, or null before the first action.</value>
     internal string? ActionLabel { get; private set; }
 
@@ -101,6 +101,10 @@ internal sealed class ScenarioContext
     /// <value>The response, already checked to be the expected type.</value>
     internal object? QueryResult { get; set; }
 
+    /// <summary>Gets or sets the Alba result of the most recent <c>WhenHttp</c>.</summary>
+    /// <value>The result, or null if the request threw or the last action wasn't a <c>WhenHttp</c>.</value>
+    internal Alba.IScenarioResult? HttpResult { get; set; }
+
     /// <summary>
     /// Gets a value indicating whether an exception from the most recent action has not been claimed yet.
     /// </summary>
@@ -118,8 +122,15 @@ internal sealed class ScenarioContext
         ActionExceptionClaimed = false;
         TrackedSession = null;
         QueryResult = null;
+        HttpResult = null;
         Snapshots.Clear();
     }
+
+    /// <summary>
+    /// Updates <see cref="ActionLabel"/> to the current step label without resetting any action state, for a step
+    /// that only learns its full description part way through running.
+    /// </summary>
+    internal void RelabelAction() => ActionLabel = CurrentStepLabel;
 
     /// <summary>
     /// Opens a writable session for the scenario's tenant.

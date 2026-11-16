@@ -22,6 +22,7 @@ Status: **ready** (fully specified), **outline** (written in full when it is nex
 | P05 NuGet package | Packable project, `just pack`, `just package-check`, CI artifact and manual release job | PDR-0010, ADR-0013 | none | done |
 | P06 String stream ids | `string` overloads of every stream method, second test host | new PDR superseding PDR-0008 | none | needs decision |
 | P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision |
+| P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done |
 
 ### Outlines
 

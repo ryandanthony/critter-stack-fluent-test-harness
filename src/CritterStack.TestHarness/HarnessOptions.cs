@@ -36,4 +36,13 @@ public sealed class HarnessOptions
     /// </summary>
     /// <value>Defaults to <see langword="false"/>.</value>
     public bool IncludeExternalMessages { get; set; }
+
+    /// <summary>
+    /// Gets or sets how a <c>WhenHttp</c> request carries the scenario's tenant, for scenarios that call
+    /// <c>ForTenant</c>. Services detect the tenant differently (a header, a claim, a route segment), so the harness
+    /// can't guess. A <c>ForTenant</c> scenario with a <c>WhenHttp</c> and no <c>HttpTenant</c> fails at once.
+    /// </summary>
+    /// <value>Called with the Alba request and the tenant id, after the test's own request configuration.
+    /// Defaults to <see langword="null"/>. For example <c>(x, tenant) =&gt; x.WithRequestHeader("tenant", tenant)</c>.</value>
+    public Action<Alba.Scenario, string>? HttpTenant { get; set; }
 }

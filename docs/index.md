@@ -21,6 +21,7 @@ The docs are split by what you need right now.
 - [Assert published messages](how-to/assert-published-messages.md)
 - [Test multi-tenant handlers](how-to/test-multi-tenant-handlers.md)
 - [Query read models](how-to/query-read-models.md)
+- [Test HTTP endpoints](how-to/test-http-endpoints.md)
 - [Debug a failing scenario](how-to/debug-a-failing-scenario.md)
 
 ## Reference

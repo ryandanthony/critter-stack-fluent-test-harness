@@ -22,6 +22,30 @@ internal static class Failure
         new($"{stepLabel}: {message}", innerException);
 
     /// <summary>
+    /// Finds a harness failure raised inside code that Wolverine or Alba ran for the harness (and may have wrapped),
+    /// so it surfaces as itself rather than being mistaken for a handler exception.
+    /// </summary>
+    /// <param name="exception">The exception that escaped.</param>
+    /// <returns>The harness failure, or null if there is none.</returns>
+    internal static HarnessAssertionException? Find(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is HarnessAssertionException failure)
+            {
+                return failure;
+            }
+
+            if (current is AggregateException aggregate)
+            {
+                return aggregate.Flatten().InnerExceptions.OfType<HarnessAssertionException>().FirstOrDefault();
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Gets a short, readable name for a type, including generic arguments.
     /// </summary>
     /// <param name="type">The type.</param>
