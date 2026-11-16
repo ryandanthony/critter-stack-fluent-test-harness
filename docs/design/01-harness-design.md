@@ -433,7 +433,7 @@ User docs follow [Diátaxis](https://diataxis.fr/). It separates four kinds of d
 | Reference | working | cognition | work | "What exactly does this method / option / failure do?" |
 | Explanation | studying | cognition | study | "Why does the harness behave this way?" |
 
-Docs live in `docs/` as plain Markdown that renders on GitHub (no site generator in v1). The target shape is below. Following Diátaxis's own workflow, folders and pages are **not** created empty up front: a page is only added once it has real content, and a section folder appears when its first page does. For v1 the pages are written after the code they describe (see the `docs-*` todos); after v1, any change to the harness updates the affected pages in the same pull request.
+Docs live in `docs/` as plain Markdown that renders on GitHub, and since 2026-11-16 also as a Docusaurus site built from the same files ([PDR-0012](../product-decision-log/PDR-0012-docs-published-as-a-website.md)). The target shape is below. Following Diátaxis's own workflow, folders and pages are **not** created empty up front: a page is only added once it has real content, and a section folder appears when its first page does. For v1 the pages are written after the code they describe (see the `docs-*` todos); after v1, any change to the harness updates the affected pages in the same pull request.
 
 ```
 README.md                          what it is, a 10-line example, links into docs/, build commands
@@ -442,12 +442,13 @@ docs/
   tutorials/
     first-scenario.md              add the harness to a small service, write a Given/When/Then, run it green, break it on purpose and read the failure
   how-to/
-    add-to-a-service.md            copy the project in, add package versions, wire it to an existing Alba fixture
+    add-to-a-service.md            add the package, check Critter Stack versions, wire it to an existing Alba fixture
     choose-projection-sync.md      pick CatchUp / WaitForNonStale / None for your host
     test-expected-exceptions.md    ThenThrows first, predicates, what can't be claimed
     assert-published-messages.md   ThenPublished, hosts with real transports, IncludeExternalMessages, TrackingTimeout
     test-multi-tenant-handlers.md  ForTenant and tenant isolation
     query-read-models.md           When then WhenQuery, ThenResult
+    test-http-endpoints.md         WhenHttp, ThenStatusCode, ThenResponse, HttpTenant (added 2026-11-16)
     debug-a-failing-scenario.md    reading the failure message, payloads, InnerException
   reference/
     api.md                         every stage and method, laid out to mirror the stage interfaces, with the valid-next-step table
@@ -459,7 +460,7 @@ docs/
     appended-vs-whole-stream.md    the two kinds of stream assertion and the version snapshot
     projection-sync.md             why sync runs before When and WhenQuery, and the dirty flag
     exception-handling.md          handler vs infrastructure failures, why unclaimed exceptions fail early
-    design-decisions.md            portability, no data wipe, one tenant per scenario, payloads in failures, what v1 leaves out
+    design-decisions.md            one package, queries and HTTP requests, no data wipe, one tenant per scenario, payloads in failures, what v1 leaves out
 ```
 
 Writing rules, from the Diátaxis guidance for each kind:

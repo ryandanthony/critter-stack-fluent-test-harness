@@ -38,7 +38,7 @@ Restore needs a GitHub token with `read:packages` stored for the `github` NuGet 
 docs/                                 user docs (Diátaxis) + decision logs, design, implementation plan
 website/                              Docusaurus site that renders docs/ (no Markdown lives here)
 src/
-  CritterStack.TestHarness/           the harness: Alba, Marten, WolverineFx only; self-contained csproj
+  CritterStack.TestHarness/           the harness, packed as the CritterStack.TestHarness NuGet package (deps: Alba, Marten, WolverineFx)
     Stages/                           public stage interfaces
     Internal/                         builder, runner, context, sync, classifier, formatter, Steps/
   CritterStack.TestHarness.Tests/     tests, TestDomain/ (Widget), Infrastructure/ (hosts), DocSamples/
