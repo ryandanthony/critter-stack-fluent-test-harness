@@ -53,7 +53,9 @@ const config: Config = {
           path: '../docs',
           routeBasePath: '/',
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/ryandanthony/critterstack-fluent-testharness/edit/main/',
+          // docs live outside website/, so the default editUrl + relative path would contain "../docs".
+          editUrl: ({docPath}) =>
+            `https://github.com/ryandanthony/critterstack-fluent-testharness/edit/main/docs/${docPath}`,
           exclude: ['**/node_modules/**'],
         },
         blog: false,
