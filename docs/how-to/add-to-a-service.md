@@ -36,7 +36,7 @@ Your test host needs:
 
 - Marten registered with `AddMarten(...).IntegrateWithWolverine()`;
 - Wolverine registered with `UseWolverine(...)`, finding your handlers;
-- `WolverineFx.RuntimeCompilation` referenced, if Wolverine runs in the default `TypeLoadMode.Dynamic`;
+- `WolverineFx.RuntimeCompilation` referenced, if Wolverine runs in the default `TypeLoadMode.Dynamic`. If your service only references it in Debug (to ship Release without Roslyn), run the tests in Debug too, or the host fails to start with "no IAssemblyGenerator (Roslyn) is registered";
 - `DisableAllExternalWolverineTransports()`, unless you want tracking to wait on real brokers (see [assert published messages](assert-published-messages.md)).
 
 ## 4. Write a first scenario
