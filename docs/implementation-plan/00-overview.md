@@ -24,12 +24,13 @@ Status: **ready** (fully specified), **outline** (written in full when it is nex
 | P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision |
 | P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done |
 | P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change. Deploy waits for Pages (ADR-0015 **Open**) | PDR-0012, ADR-0015 | none | done (deploy pending P03) |
+| P10 Projection-error flake | Apply errors the daemon hits outside the forced catch-up fail the next action, so `ProjectionErrorTests` is stable on 1-CPU runners (CI was red on `main`) | ADR-0016 | none | done |
 
 ### Outlines
 
 - **P01 First consumer.** Follow `how-to/add-to-a-service.md` literally in the consuming repo. Anything the guide misses is a doc fix here. Anything the harness can't express is either a `HarnessOptions` field (ADR-0013) or a new record. Done when the consumer's CI runs the scenarios.
 - **P02 Tutorial walk-through.** Today the tutorial is only proven by `FirstScenarioSamples`; nobody has read it as a newcomer.
-- **P03 First publish.** Decide public repo + nuget.org, or private repo + festina-lente-io GitHub Packages. For nuget.org: on nuget.org add a trusted-publishing policy (owner `ryandanthony`, repo `critterstack-fluent-testharness`, workflow `build.yml`), then Actions > Build > Run workflow with `publish` ticked. The first version is whatever GitVersion computes (1.0.x today); tag `v1.0.0` first if you want a round number.
+- **P03 First publish.** Decide public repo + nuget.org, or private repo + festina-lente-io GitHub Packages. For nuget.org: on nuget.org add a trusted-publishing policy (owner `ryandanthony`, repo `critterstack-fluent-testharness`, workflow `build.yml`), then Actions > Build > Run workflow with `publish` ticked. The first version is whatever GitVersion computes (1.3.x on 2026-11-16, check with `dotnet gitversion /showvariable SemVer`).
 - **P04 Upgrade.** Run `dotnet list package --outdated`, bump `Directory.Packages.props` and `samples/ConsumerService/Directory.Packages.props.template` together, run `just test` and `just package-check`, update [reference/compatibility.md](../reference/compatibility.md).
 
 ## v1 build log

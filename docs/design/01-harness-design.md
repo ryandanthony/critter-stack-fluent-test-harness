@@ -351,7 +351,7 @@ Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
 
 ## Tests
 
-> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md). The list below is the v1 baseline; the suite has grown since (135 tests at 2026-11-16, see the [build log](../implementation-plan/00-overview.md#v1-build-log)).
+> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md). The list below is the v1 baseline; the suite has grown since (159 tests at 2026-11-16 after WhenHttp, see the [implementation plan](../implementation-plan/00-overview.md)).
 
 The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, which travels with the harness. It has its own tiny test domain and host:
 
