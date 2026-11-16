@@ -43,7 +43,20 @@ const config: Config = {
     },
   },
 
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: [
+    '@docusaurus/theme-mermaid',
+    [
+      // Offline full-text search, built into the static site at build time (PDR-0012). No external service.
+      '@easyops-cn/docusaurus-search-local',
+      {
+        docsRouteBasePath: '/',
+        docsDir: '../docs',
+        indexBlog: false,
+        hashed: true,
+        highlightSearchTermsOnTargetPage: true,
+      },
+    ],
+  ],
 
   presets: [
     [
