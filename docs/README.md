@@ -4,7 +4,7 @@ A fluent Given/When/Then test harness for Marten and Wolverine services. This fo
 
 ## For people using the harness
 
-User docs follow [Diátaxis](https://diataxis.fr/) ([PDR-0009](./product-decision-log/PDR-0009-diataxis-docs-with-runnable-samples.md)). Start at [index.md](./index.md).
+User docs follow [Diátaxis](https://diataxis.fr/) ([PDR-0009](./product-decision-log/PDR-0009-diataxis-docs-with-runnable-samples.md)). Start at [index.md](./index.md). The same pages are published as a website built from this folder ([PDR-0012](./product-decision-log/PDR-0012-docs-published-as-a-website.md)), so keep them plain Markdown that reads well on GitHub too.
 
 | Folder | Holds |
 |---|---|

@@ -22,6 +22,7 @@ The [design](../design/README.md) unifies these ADRs with the [PDRs](../product-
 | [ADR-0012](./ADR-0012-docs-and-portability-enforced-by-tests.md) | Docs and portability are enforced by tests | accepted (portability bullet superseded by ADR-0013) |
 | [ADR-0013](./ADR-0013-ship-the-harness-as-a-nuget-package.md) | Ship the harness as a NuGet package | accepted |
 | [ADR-0014](./ADR-0014-whenhttp-through-alba-under-tracking.md) | WhenHttp runs the Alba scenario under Wolverine tracking | accepted |
+| [ADR-0015](./ADR-0015-docusaurus-site-on-github-pages.md) | Docusaurus site over docs/, deployed to GitHub Pages | accepted |
 
 ## Template
 

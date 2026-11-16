@@ -1,6 +1,6 @@
 # PDR-0009: User docs follow Diátaxis, and every sample runs
 
-- **Status:** accepted
+- **Status:** accepted (the GitHub-only rendering and deferred site generator are superseded by [PDR-0012](./PDR-0012-docs-published-as-a-website.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Documentation)

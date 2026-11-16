@@ -23,6 +23,7 @@ Status: **ready** (fully specified), **outline** (written in full when it is nex
 | P06 String stream ids | `string` overloads of every stream method, second test host | new PDR superseding PDR-0008 | none | needs decision |
 | P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision |
 | P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done |
+| P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change. Deploy waits for Pages (ADR-0015 **Open**) | PDR-0012, ADR-0015 | none | done (deploy pending P03) |
 
 ### Outlines
 

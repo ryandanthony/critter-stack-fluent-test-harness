@@ -27,6 +27,7 @@ just pack           # CritterStack.TestHarness .nupkg + .snupkg into artifacts/
 just package-check  # Pack, install into a throwaway consumer service, run its scenarios (needs Docker)
 just decisions      # PDR/ADR list with statuses
 just docs-check     # Verify relative links in docs/
+just docs-site      # Build the Docusaurus site from docs/ (needs Node 20)
 ```
 
 Restore needs a GitHub token with `read:packages` stored for the `github` NuGet source ([ADR-0011](docs/architecture-decision-log/ADR-0011-build-quality-versioning-and-ci.md)).
@@ -35,6 +36,7 @@ Restore needs a GitHub token with `read:packages` stored for the `github` NuGet 
 
 ```
 docs/                                 user docs (Diátaxis) + decision logs, design, implementation plan
+website/                              Docusaurus site that renders docs/ (no Markdown lives here)
 src/
   CritterStack.TestHarness/           the harness: Alba, Marten, WolverineFx only; self-contained csproj
     Stages/                           public stage interfaces

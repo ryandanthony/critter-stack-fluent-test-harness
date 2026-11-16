@@ -26,6 +26,10 @@ pack: build
 package-check: pack
   ./scripts/check-package.sh
 
+# Build the Docusaurus docs site from docs/ (strict: broken links fail). Needs Node 20.
+docs-site:
+  cd website && npm ci && npm run build
+
 # List product and architecture decision records with their status.
 decisions:
   #!/usr/bin/env bash
