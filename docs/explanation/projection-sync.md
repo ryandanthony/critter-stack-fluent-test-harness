@@ -22,6 +22,8 @@ The "only if something was written" rule means two queries in a row sync once, a
 
 So the harness checks whether the host has a projection coordinator and picks the path that works. Test hosts often skip the daemon to start faster, and production-like test hosts often run it; neither needs different settings.
 
+On a daemon host, the forced catch-up only reports errors it hits itself. The daemon also runs on its own, so it can reach a bad event first and pause that projection quietly. To catch that, the harness watches the store's shard states for the length of each scenario and fails the next action if a projection paused with an error. The record is [ADR-0016](../architecture-decision-log/ADR-0016-shard-watcher-catches-missed-apply-errors.md).
+
 ## Why `WaitForNonStale` exists too
 
 `WaitForNonStale` waits for the host's daemon to catch up on its own instead of forcing it. Use it when you want tests to exercise the daemon the way production does. It only works with a daemon.

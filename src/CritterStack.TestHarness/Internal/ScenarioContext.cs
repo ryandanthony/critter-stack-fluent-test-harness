@@ -50,6 +50,10 @@ internal sealed class ScenarioContext
     /// <value>The started stream ids.</value>
     internal HashSet<Guid> StartedStreams { get; } = [];
 
+    /// <summary>Gets or sets the watcher that records daemon shards pausing with an error during this scenario.</summary>
+    /// <value>The watcher, or null when the host runs no daemon or the sync mode isn't <c>CatchUp</c>.</value>
+    internal ShardFailureWatcher? ShardFailures { get; set; }
+
     /// <summary>Gets each snapshotted stream's version, taken just before the most recent <c>When</c>.</summary>
     /// <value>Stream id to version.</value>
     internal Dictionary<Guid, long> Snapshots { get; } = [];

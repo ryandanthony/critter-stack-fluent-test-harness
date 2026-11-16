@@ -70,20 +70,37 @@ internal static class ProjectionSyncRunner
         // build a temporary one. Never build one on a host that has a daemon: two daemons fight over progress.
         if (context.Host.Services.GetService<IProjectionCoordinator>() is not null)
         {
-            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutSource.CancelAfter(timeout);
-            var errors = await context.Host
-                .ForceAllMartenDaemonActivityToCatchUpAsync(timeoutSource.Token)
-                .ConfigureAwait(false);
-            if (errors.Count > 0)
-            {
-                throw new AggregateException("Marten reported projection errors while catching up.", errors);
-            }
-
+            await CatchUpRunningDaemonAsync(context, timeout, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         using var daemon = await context.Store.BuildProjectionDaemonAsync().ConfigureAwait(false);
         await daemon.CatchUpAsync(timeout, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Catches up the host's own daemon. Marten only reports an apply error that happens during the forced
+    /// catch-up. If the daemon's background run reached the bad event first (before the catch-up, or while the
+    /// coordinator restarts the shards after it), the shard is paused outside the catch-up and Marten reports
+    /// nothing. So pauses with an exception that the scenario's shard watcher saw count as errors too.
+    /// </summary>
+    private static async Task CatchUpRunningDaemonAsync(ScenarioContext context, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
+        var errors = (await context.Host
+                .ForceAllMartenDaemonActivityToCatchUpAsync(timeoutSource.Token)
+                .ConfigureAwait(false))
+            .ToList();
+
+        if (errors.Count == 0 && context.ShardFailures is { } watcher)
+        {
+            errors.AddRange(await watcher.WaitForFailuresAsync(cancellationToken).ConfigureAwait(false));
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new AggregateException("Marten reported projection errors while catching up.", errors);
+        }
     }
 }

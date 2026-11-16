@@ -33,6 +33,8 @@ internal static class ScenarioRunner
         PlanSnapshots(steps);
 
         var context = new ScenarioContext(host, options, tenantId);
+        using var shardFailures = await ShardFailureWatcher.StartAsync(host, options, context.Store).ConfigureAwait(false);
+        context.ShardFailures = shardFailures;
         for (var i = 0; i < steps.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
