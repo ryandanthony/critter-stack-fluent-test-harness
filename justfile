@@ -21,3 +21,32 @@ test: build
 # Copy the harness into a throwaway service (no repo build props) and run that service's scenarios (requires Docker).
 portability:
   ./scripts/check-portability.sh
+
+# List product and architecture decision records with their status.
+decisions:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  for log in docs/product-decision-log docs/architecture-decision-log; do
+    echo "=== ${log#docs/} ==="
+    for f in "$log"/[PA]DR-*.md; do
+      title=$(head -1 "$f" | sed 's/^# //')
+      status=$(grep -m1 -oP '^\- \*\*Status:\*\* \K\w+' "$f" || echo '?')
+      printf "  %-11s %s\n" "[$status]" "$title"
+    done
+    echo ""
+  done
+
+# Check that relative links in README.md, AGENTS.md and docs/ resolve.
+docs-check:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  broken=0
+  while IFS= read -r f; do
+    d=$(dirname "$f")
+    # Ignore links inside fenced code blocks (templates use placeholder links), external links and anchors.
+    while IFS= read -r l; do
+      [[ -e "$d/$l" ]] || { echo "✗ $f -> $l"; broken=1; }
+    done < <(awk '/^```/{c=!c; next} !c' "$f" | grep -oE '\]\([^)#]+' | sed 's/^](//' | grep -vE '^[a-z]+:' || true)
+  done < <(find README.md AGENTS.md docs -name '*.md')
+  [[ $broken -eq 0 ]] && echo "✓ docs links OK"
+  exit $broken

@@ -68,6 +68,10 @@ jobs:
       - name: Portability check
         run: just portability
 
+      # Relative links in README, AGENTS.md and docs/ (decision logs, design, plan, user docs) must resolve.
+      - name: Docs link check
+        run: just docs-check
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

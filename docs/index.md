@@ -39,3 +39,7 @@ The docs are split by what you need right now.
 - [Design decisions](explanation/design-decisions.md)
 
 Every code sample in the tutorial and how-to guides is a test in `src/CritterStack.TestHarness.Tests/DocSamples/`. The comment above each sample names its test.
+
+## Changing the harness
+
+Decisions, design and plan live alongside these pages: [product decisions](product-decision-log/README.md) (PDRs), [architecture decisions](architecture-decision-log/README.md) (ADRs), the [design](design/README.md) and the [implementation plan](implementation-plan/00-overview.md). See [docs/README.md](README.md) for how they fit together.

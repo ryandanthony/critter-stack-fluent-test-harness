@@ -1,6 +1,6 @@
 # Design decisions
 
-The choices behind the harness, and what v1 deliberately leaves out. The full build plan is in [`initial-design.md`](../../initial-design.md).
+The choices behind the harness, and what v1 deliberately leaves out. Each one is on record as a [product decision](../product-decision-log/README.md) or an [architecture decision](../architecture-decision-log/README.md), and the full design is in [`design/`](../design/README.md).
 
 ## Portable by copying
 

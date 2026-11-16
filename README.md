@@ -21,6 +21,8 @@ await TestHarness
 
 Start with the [tutorial](docs/tutorials/first-scenario.md), or see the [documentation index](docs/index.md).
 
+Working on the harness itself? Decisions are recorded as [PDRs](docs/product-decision-log/README.md) and [ADRs](docs/architecture-decision-log/README.md), with the [design](docs/design/README.md) and [implementation plan](docs/implementation-plan/00-overview.md) alongside. See [AGENTS.md](AGENTS.md).
+
 ## Build and test
 
 You need the .NET 10 SDK, [just](https://github.com/casey/just), Docker (the tests start Postgres with Testcontainers), and a GitHub token with `read:packages` stored for the `github` NuGet source (for `FestinaLente.CodeStandards`).

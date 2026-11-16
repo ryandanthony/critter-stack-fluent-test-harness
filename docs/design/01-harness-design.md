@@ -1,10 +1,12 @@
----
-name: Fluent Critter Stack harness
-overview: A standalone, reusable, fluent Given/When/Then test harness for Marten and Wolverine. It plugs into any service's Alba host, sends commands and queries through Wolverine, and asserts on stream events and query results.
-isProject: false
----
+# 01: Harness design
 
-# Fluent Marten/Wolverine Test Harness
+A standalone, reusable, fluent Given/When/Then test harness for Marten and Wolverine. It plugs into any service's Alba host, sends commands and queries through Wolverine, and asserts on stream events and query results.
+
+- **Status:** implemented (v1). This was the build plan, `initial-design.md`; the v1 version is at commit `01a7e35`.
+- **Grounded in:** PDR-0001 to PDR-0009, ADR-0002 to ADR-0012 (see the [map](./README.md#where-each-record-lands)).
+- **Build log:** the todo list that drove v1 is in [implementation-plan/00-overview.md](../implementation-plan/00-overview.md#v1-build-log).
+
+The records are the contract. Where this document and a record disagree, the record wins and this document is fixed. Verification notes ("verified") refer to Marten 9.44, Wolverine 6.44 and Alba 8.5.3 ([ADR-0002](../architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md)).
 
 ## Target API
 
@@ -43,6 +45,8 @@ public class WidgetScenarios(NoDaemonHostFixture fixture)
 ```
 
 ## Design
+
+> Records: [PDR-0001](../product-decision-log/PDR-0001-fluent-scenarios-on-the-services-own-host.md), [PDR-0002](../product-decision-log/PDR-0002-appended-vs-whole-stream-assertions.md), [PDR-0003](../product-decision-log/PDR-0003-projections-current-before-every-action.md), [PDR-0004](../product-decision-log/PDR-0004-handler-exceptions-are-assertable.md), [PDR-0005](../product-decision-log/PDR-0005-failures-show-the-actual-data.md), [PDR-0007](../product-decision-log/PDR-0007-one-tenant-per-scenario.md), [PDR-0008](../product-decision-log/PDR-0008-v1-non-goals.md); [ADR-0004](../architecture-decision-log/ADR-0004-self-contained-harness-project.md) to [ADR-0010](../architecture-decision-log/ADR-0010-payloads-use-the-stores-serializer.md).
 
 ```mermaid
 flowchart LR
@@ -160,6 +164,8 @@ flowchart LR
 
 ## Fluent stage interfaces
 
+> Records: [ADR-0005](../architecture-decision-log/ADR-0005-deferred-steps-and-staged-interfaces.md).
+
 Each method returns the interface for the next stage, so IntelliSense offers only valid steps and a misordered scenario fails to compile. The interfaces only limit what can be called next; behind them:
 
 - One internal, non-generic `ScenarioBuilder` owns the recorded step list and implements `IScenarioStart`, `IGivenStage` and `ICommandStage`.
@@ -243,6 +249,8 @@ stateDiagram-v2
 - Because every `QueryStage<TResponse>` forwards to the one `ScenarioBuilder`, switching between commands and queries keeps the full history in a single step list.
 
 ## Files
+
+> Records: [ADR-0002](../architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md), [ADR-0004](../architecture-decision-log/ADR-0004-self-contained-harness-project.md), [ADR-0011](../architecture-decision-log/ADR-0011-build-quality-versioning-and-ci.md).
 
 This is a standalone repo. The harness library lives in `src/CritterStack.TestHarness/` (root namespace `CritterStack.TestHarness`).
 
@@ -342,6 +350,8 @@ Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
 
 ## Tests
 
+> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md). The list below is the v1 baseline; the suite has grown since (135 tests at 2026-11-16, see the [build log](../implementation-plan/00-overview.md#v1-build-log)).
+
 The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, which travels with the harness. It has its own tiny test domain and host:
 
 - `TestDomain/`: a minimal domain that exercises every harness feature without depending on any service:
@@ -399,7 +409,7 @@ The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, wh
 
 Every test gets a `business_value` trait that states what the test protects.
 
-## Risks / verify during implementation
+## Risks and verification findings
 
 - **Verified portability (2026-10-01):** copying the project into a service that does not use this repo's build props was tried for real, and it failed twice before working: (1) the csproj had no `TargetFramework` (it came from `Directory.Build.props`), so it didn't build outside this repo; the csproj now sets `TargetFramework`, `Nullable` and `ImplicitUsings` itself; (2) the public `ScenarioAssertionException` clashed with `Alba.ScenarioAssertionException` (CS0104) in any test file that imports both namespaces, which every Alba-based consumer does; it is now `HarnessAssertionException`. `scripts/check-portability.sh` (`just portability`, run in CI) repeats the copy into a throwaway directory with its own package versions and nuget.org only, and runs a separate sample service (`samples/ConsumerService`, an Order domain) against it. It fails with the old csproj (checked).
 - **Verified API reference completeness:** `ApiReferenceCoverageTests` fails the build if any public type, member or enum value of the harness is missing from `docs/reference/api.md` or `harness-options.md` (checked by adding an undocumented property and watching it fail). It checks presence, not that the description is right.
@@ -410,6 +420,8 @@ Every test gets a `business_value` trait that states what the test protects.
 - Restore fails without a GitHub token for the `github` source, both locally and in CI.
 
 ## Documentation
+
+> Records: [PDR-0009](../product-decision-log/PDR-0009-diataxis-docs-with-runnable-samples.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md).
 
 User docs follow [Diátaxis](https://diataxis.fr/). It separates four kinds of documentation by what the reader needs, and keeps each page to one kind:
 
@@ -461,47 +473,4 @@ Keeping the docs accurate:
 
 - **XML doc comments (reference in the IDE):** every public type and member in `CritterStack.TestHarness` has a `<summary>`, and methods have `<param>`, `<returns>` and, where useful, `<example>` and `<exception>`. Stage methods state the stage they're valid on and the stage they return, and Thens state which `When` or `WhenQuery` they refer to, so IntelliSense carries the step-ordering rules. These comments are reference material, so they follow the reference rules above. `GenerateDocumentationFile` plus warnings as errors makes a missing comment fail the build. `docs/reference/api.md` describes the same behaviour and is written by hand. `ApiReferenceCoverageTests` fails the build if a public member is missing from it, but nothing checks that the wording of the two agrees, so update both together.
 - **Samples that compile and pass:** every C# code block and example failure message in `docs/tutorials/` and `docs/how-to/` has a matching test in `src/CritterStack.TestHarness.Tests/DocSamples/`, and each block carries a `<!-- Test: ... -->` comment naming it. `just test` fails if a sample's test breaks, and `DocSampleSyncTests` fails if any line of a C# sample block is missing from the `DocSamples/` sources or a marker names a test that doesn't exist (verified by editing a sample and watching it fail). Plain-text blocks such as example failure messages aren't line-checked; their tests assert the message shape instead.
-- **This design doc** (`initial-design.md`) is the build plan, not user documentation. Once v1 ships, the parts worth keeping move into `docs/explanation/design-decisions.md`.
-
-## Todos
-
-In build order. Each item lists what "done" means.
-
-- [x] **verify-apis:** Use Context7 to confirm, for the pinned Marten 9.44 and Wolverine 6.44 versions:
-  - Marten: `ForceAllMartenDaemonActivityToCatchUpAsync`, `WaitForNonStaleProjectionDataAsync`, `FetchStreamAsync`, `FetchStreamStateAsync`, `StartStream`/`Append`, conjoined event tenancy, and `Options.Serializer()`;
-  - Wolverine: `ExecuteAndWaitAsync`, `InvokeForTenantAsync` (on `IMessageContext` and `IMessageBus`), the `ITrackedSession` shape (for `ThenPublished`), tracking options for `TrackingTimeout` and `IncludeExternalMessages`, and `MessageStorageSchemaName` on `IntegrateWithWolverine`;
-  - the exception types for each infrastructure failure (wrong `TResponse`, tracking timeout, no handler, sync timeout, stream id collision) and how a handler exception surfaces from tracking (direct or wrapped in `AggregateException`);
-  - Alba 8.5.3 works with Wolverine 6.44 tracking on a `net10.0` host.
-  - Update the design (pinned versions, API names, the **Risks** section) wherever something differs.
-  - Done 2026-10-01 via Context7, reflection and a runtime probe (see **Risks**). It changed the design in six places: the two-path `CatchUp`, the classifier table, the `WolverineFx.RuntimeCompilation` package, the `ExecuteAndWaitAsync` lambda cast, `IncludeType` handler discovery, `ThenPublished` reading `Sent`, and `WhenQuery` type-checking the response itself (Wolverine returns `default` for a wrong `TResponse` instead of throwing).
-- [x] **scaffold:** Add `global.json` (.NET 10 SDK), `nuget.config` (nuget.org plus the festina-lente-io GitHub feed, with source mapping), `src/Directory.Packages.props` (the pinned versions in **Files**), `src/Directory.Build.props` (`net10.0`, nullable, implicit usings, warnings as errors, CodeStandards, xunit v3 and the test SDK for `*.Tests`), `src/Directory.Build.targets` and `src/stylecop.json` (both from awen), `src/CritterStack.TestHarness.slnx` and a root `justfile` with `build` and `test` recipes. `FestinaLente.CodeStandards` restores from the GitHub feed, and `just build` succeeds on an empty solution.
-- [x] **project:** Create both projects and add them to the slnx:
-  - `CritterStack.TestHarness` (Alba, Marten, WolverineFx only; no `ProjectReference`), with `InternalsVisibleTo("CritterStack.TestHarness.Tests")` for the sync-count hook;
-  - `CritterStack.TestHarness.Tests` (references the harness, WolverineFx.Marten, WolverineFx.RuntimeCompilation and Testcontainers.PostgreSql).
-- [x] **stages:** Add the public API: `TestHarness.Setup`, `HarnessOptions` (with defaults), `IScenario`, `IScenarioStart`, `IGivenStage`, `IThenStage<TSelf>`, `ICommandStage` and `IQueryStage<TResponse>`, each with full XML doc comments (see **Documentation**). The Target API sample compiles, a misordered chain doesn't, and the build has no CS1591 warnings.
-- [x] **core:** Implement the internal plumbing:
-  - `ScenarioBuilder` (records steps, holds the tenant id, implements `IScenarioStart`, `IGivenStage` and `ICommandStage`) and `QueryStage<TResponse>` (forwards to the builder);
-  - `IScenarioStep` and `ScenarioRunner`: runs steps in order on `RunAsync`/`GetAwaiter`, honours the `CancellationToken`, and pre-scans the steps to find which stream ids each `When` must snapshot;
-  - `ScenarioContext`: host, tenant, tracked session, pending/claimed exception, last query result, stream-version snapshots, the started-stream set and the projection-sync "dirty" flag;
-  - tenant-aware session and invoke helpers (one code path with and without a tenant);
-  - projection sync (`CatchUp`, `WaitForNonStale`, `None`) with the dirty flag, `ProjectionTimeout`, and an internal hook that counts sync calls;
-  - the exception classifier (handler exception vs infrastructure failure) and the unclaimed-exception rule (fail at the first non-`ThenThrows` `Then`, the next `When`/`WhenQuery`, or the end);
-  - `HarnessAssertionException` and a failure-message formatter that writes step name, event versions, type names and JSON payloads with the store's serializer, and attaches `InnerException` when caused by an exception.
-- [x] **steps:** Implement each step on top of `core`:
-  - `GivenStreamStep` (start on first use of an id, append after);
-  - `WhenCommandStep` (sync if dirty, snapshot versions, tracked invoke, capture handler exception, keep `ITrackedSession`);
-  - `WhenQueryStep` (sync if dirty, invoke as `object`, capture handler exception, fail at once on a non-null result that isn't `TResponse`, store typed result);
-  - `StreamAssertionStep` (has / has-no with predicate / count, whole stream);
-  - appended / not-appended with predicate / count, since the snapshot (implemented in `StreamAssertionStep` with `StreamScope.Appended` rather than a separate class);
-  - `ThrowsAssertionStep`, `PublishedAssertionStep` and `ResultAssertionStep`.
-- [x] **test-domain:** Build `TestDomain/`: the `Widget` aggregate, its events, the `RenameWidget`, `PublishWidget`, `FailWidget`, `StallWidget` and `ArchiveWidget` commands and handlers, the `GetWidgetById` query and handler, and the `WidgetDetails` (inline) and `WidgetSummary` (async) projections.
-- [x] **fixtures:** Build `PostgresContainerFixture` (assembly fixture), the abstract `HarnessHostFixture` with conjoined tenancy and per-host schemas, `NoDaemonHostFixture`, `DaemonHostFixture`, and the `NoDaemonCollection` and `DaemonCollection` definitions. Each host starts and stops cleanly against the shared container.
-- [x] **tests:** Write `TestHarnessTests`, `ProjectionSyncTests`, `StepOrderingTests` and `AssertionMessageTests` covering every case in the **Tests** list, each with a `business_value` trait. Done: 40 harness tests (including `DaemonProjectionSyncTests` for the daemon host), green three runs in a row in about 15 seconds. With the doc samples (19) and `DocSampleSyncTests` (16 page checks) the suite is 75 tests. Extra test-domain messages added along the way: `FailWidgetLater`, `TimeOutWidget`, `RecordTenant`, `UnhandledCommand` and `FindWidget`.
-- [x] **versioning:** Add `GitVersion.yml` (copied from awen) and the `GitVersion.MsBuild` reference in `src/Directory.Build.props`. `just build` produces assemblies whose informational version is `{SemVer}+{ShortSha}`, and `obj/gitversion.json` exists.
-- [x] **ci:** Add `.github/workflows/build.yml` as described in **Files**. A pull request run builds, prints the GitVersion `SemVer`, runs the full test suite (including the Testcontainers tests) and uploads the `trx` results.
-- [x] **docs-reference:** Write `docs/reference/` (`api.md`, `harness-options.md`, `failure-messages.md`, `compatibility.md`) from the finished code and XML comments. Every public member and every failure in the harness appears exactly once, in the layout described in **Documentation**.
-- [x] **docs-how-to:** Write the seven `docs/how-to/` guides, each with its code blocks backed by a `DocSamples/` test that passes.
-- [x] **docs-tutorial:** Write `docs/tutorials/first-scenario.md`, backed by `DocSamples/` tests, and walk through it from a clean clone to confirm every step and expected output is right. Done as: every code block and the shown failure message are asserted by `FirstScenarioSamples`, which passed from a fresh local clone and in CI's clean checkout. Nobody has followed it by hand as a new reader yet.
-- [x] **docs-explanation:** Write the five `docs/explanation/` pages, moving the reasoning from this design review into them.
-- [x] **docs-entry:** Write `docs/index.md` and replace `README.md` (what it is, a 10-line example, links into `docs/`, `just build` / `just test`). Run the compass check over every page and fix anything in the wrong section.
-- [x] **verify:** Run `just build` and `just test` until both are green with no warnings (requires Docker for Testcontainers), then push and confirm the `build.yml` run is green.
+- **This design doc** is not user documentation. The decisions in it are now PDRs and ADRs ([ADR-0001](../architecture-decision-log/ADR-0001-decision-logs-design-and-plan.md)); the reader-facing *why* is in `docs/explanation/`.
