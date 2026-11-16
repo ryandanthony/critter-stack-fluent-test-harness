@@ -15,10 +15,11 @@ The [design](../design/README.md) unifies these PDRs with the [ADRs](../architec
 | [PDR-0003](./PDR-0003-projections-current-before-every-action.md) | Async projections are current before every command and query | accepted |
 | [PDR-0004](./PDR-0004-handler-exceptions-are-assertable.md) | Handler exceptions are assertable, but setup problems fail at once | accepted |
 | [PDR-0005](./PDR-0005-failures-show-the-actual-data.md) | Failures show the actual data | accepted |
-| [PDR-0006](./PDR-0006-adopt-by-copying-the-project.md) | Services adopt the harness by copying the project | accepted |
+| [PDR-0006](./PDR-0006-adopt-by-copying-the-project.md) | Services adopt the harness by copying the project | superseded by [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md) |
 | [PDR-0007](./PDR-0007-one-tenant-per-scenario.md) | One tenant per scenario | accepted |
-| [PDR-0008](./PDR-0008-v1-non-goals.md) | v1 non-goals | accepted |
+| [PDR-0008](./PDR-0008-v1-non-goals.md) | v1 non-goals | accepted (NuGet bullet superseded by PDR-0010) |
 | [PDR-0009](./PDR-0009-diataxis-docs-with-runnable-samples.md) | User docs follow Diátaxis, and every sample runs | accepted |
+| [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md) | Services adopt the harness as a NuGet package | accepted |
 
 ## Template
 

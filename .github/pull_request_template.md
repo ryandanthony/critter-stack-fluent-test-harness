@@ -12,6 +12,6 @@
 ## Validation
 
 - [ ] `just test` passes (build with warnings as errors, full suite)
-- [ ] `just portability` passes if the harness project changed
+- [ ] `just package-check` passes if the harness project changed
 - [ ] `docs/reference/` and affected samples updated if the public API changed
 - [ ] `just docs-check` passes if docs changed

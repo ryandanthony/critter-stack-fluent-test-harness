@@ -64,3 +64,4 @@ src/.codex/config.toml
 # Local tool state (the .cache file holds an OAuth token; never commit it)
 .cache
 *.DotSettings.user
+artifacts/

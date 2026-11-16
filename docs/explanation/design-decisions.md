@@ -2,9 +2,9 @@
 
 The choices behind the harness, and what v1 deliberately leaves out. Each one is on record as a [product decision](../product-decision-log/README.md) or an [architecture decision](../architecture-decision-log/README.md), and the full design is in [`design/`](../design/README.md).
 
-## Portable by copying
+## One package, three dependencies
 
-The harness is one project that references Alba, Marten and WolverineFx and nothing else. It knows nothing about any service's aggregates, projections, schemas or transports. Everything that varies between services is a `HarnessOptions` field. A service copies the project in and uses it.
+The harness ships as the `CritterStack.TestHarness` NuGet package, which depends on Alba, Marten and WolverineFx and nothing else. It knows nothing about any service's aggregates, projections, schemas or transports. Everything that varies between services is a `HarnessOptions` field, so a service adds the package and uses it as is. An earlier version had services copy the project into their repo instead; copies drifted and upgrades didn't reach them, so it became a package.
 
 ## Queries through Wolverine, not HTTP
 

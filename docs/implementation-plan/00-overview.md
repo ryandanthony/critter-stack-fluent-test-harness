@@ -6,8 +6,8 @@ v1 is built: every todo in the original plan is done and CI is green. This plan 
 
 - Harness library: about 2,100 lines in `src/CritterStack.TestHarness/`, public API as in [design/01-harness-design.md](../design/01-harness-design.md#fluent-stage-interfaces).
 - Test suite: 135 tests (about 3,300 lines, 12 s locally), real Postgres via Testcontainers, three hosts (no daemon, daemon, poison daemon) ([ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md)). Doc samples and API coverage enforced ([ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md)).
-- CI (`build.yml`) green on GitHub for everything pushed. No tags, no releases, no package ([PDR-0006](../product-decision-log/PDR-0006-adopt-by-copying-the-project.md)).
-- No service has copied the harness in yet.
+- CI (`build.yml`) green on GitHub for everything pushed. Packs `CritterStack.TestHarness` on every run and proves it installs into a consumer ([ADR-0013](../architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)). Not published yet, no tags.
+- No service uses the harness yet.
 
 ## Packets
 
@@ -15,20 +15,20 @@ Status: **ready** (fully specified), **outline** (written in full when it is nex
 
 | Packet | Outcome | Implements | Depends on | Status |
 |---|---|---|---|---|
-| P01 First consumer | One real service (Mise, which runs Marten + Wolverine, [mise ADR-0012](https://github.com/ryandanthony/mise/blob/main/docs/architecture-decision-log/ADR-0012-marten-and-wolverine.md)) copies the harness in and has at least one scenario per handler type green in its CI | PDR-0006 | none | outline |
+| P01 First consumer | One real service (Mise, which runs Marten + Wolverine, [mise ADR-0012](https://github.com/ryandanthony/mise/blob/main/docs/architecture-decision-log/ADR-0012-marten-and-wolverine.md)) adds the package and has at least one scenario per handler type green in its CI | PDR-0010 | P03 | outline |
 | P02 Tutorial walk-through | Someone new follows `tutorials/first-scenario.md` by hand from a clean clone; every gap found is fixed in the page and its `DocSamples/` test | PDR-0009 | none | outline |
-| P03 Tag v0.1.0 | First `v` tag so GitVersion and the README can name a version consumers copied | ADR-0011 | P01 | outline |
+| P03 First publish | Resolve ADR-0013's **Open** item (repo visibility vs feed), add the nuget.org trusted-publishing policy, run the release workflow; `CritterStack.TestHarness` is installable | ADR-0013 | none | needs decision |
 | P04 Critter Stack upgrade | Bump Marten, Wolverine and Alba to current; any classifier or sync behaviour change caught by tests is handled and recorded (new ADR superseding ADR-0002 if pins change materially) | ADR-0002, 0007, 0008 | none | outline |
-| P05 NuGet package | Pack and publish the harness, superseding PDR-0006 | new PDR | P01 | needs decision |
+| P05 NuGet package | Packable project, `just pack`, `just package-check`, CI artifact and manual release job | PDR-0010, ADR-0013 | none | done |
 | P06 String stream ids | `string` overloads of every stream method, second test host | new PDR superseding PDR-0008 | none | needs decision |
 | P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision |
 
 ### Outlines
 
-- **P01 First consumer.** Follow `how-to/add-to-a-service.md` literally in the consuming repo. Anything the guide misses is a doc fix here. Anything the harness can't express is either a `HarnessOptions` field (ADR-0004) or a new record. Done when the consumer's CI runs the scenarios.
+- **P01 First consumer.** Follow `how-to/add-to-a-service.md` literally in the consuming repo. Anything the guide misses is a doc fix here. Anything the harness can't express is either a `HarnessOptions` field (ADR-0013) or a new record. Done when the consumer's CI runs the scenarios.
 - **P02 Tutorial walk-through.** Today the tutorial is only proven by `FirstScenarioSamples`; nobody has read it as a newcomer.
-- **P03 Tag.** `git tag v0.1.0` on `main` after P01, so the copied source can be traced to a version. No release job yet.
-- **P04 Upgrade.** Run `dotnet list package --outdated`, bump `Directory.Packages.props` and `samples/ConsumerService/Directory.Packages.props.template` together, run `just test` and `just portability`, update [reference/compatibility.md](../reference/compatibility.md).
+- **P03 First publish.** Decide public repo + nuget.org, or private repo + festina-lente-io GitHub Packages. For nuget.org: on nuget.org add a trusted-publishing policy (owner `ryandanthony`, repo `critterstack-fluent-testharness`, workflow `build.yml`), then Actions > Build > Run workflow with `publish` ticked. The first version is whatever GitVersion computes (1.0.x today); tag `v1.0.0` first if you want a round number.
+- **P04 Upgrade.** Run `dotnet list package --outdated`, bump `Directory.Packages.props` and `samples/ConsumerService/Directory.Packages.props.template` together, run `just test` and `just package-check`, update [reference/compatibility.md](../reference/compatibility.md).
 
 ## v1 build log
 

@@ -1,6 +1,6 @@
 # ADR-0012: Docs and portability are enforced by tests
 
-- **Status:** accepted
+- **Status:** accepted (the portability-check bullet is superseded by [ADR-0013](./ADR-0013-ship-the-harness-as-a-nuget-package.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Documentation: keeping the docs accurate; Risks: verified portability, verified API reference completeness), commits `b5a30ca`, `1e46caa`

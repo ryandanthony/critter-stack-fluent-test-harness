@@ -1,6 +1,6 @@
 # ADR-0011: Build quality, versioning and CI
 
-- **Status:** accepted
+- **Status:** accepted (the no-publishing bullet is superseded by [ADR-0013](./ADR-0013-ship-the-harness-as-a-nuget-package.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Files: `nuget.config`, `Directory.Build.props`, `GitVersion.yml`, `justfile`, `build.yml`), conventions shared with `awen` and `mise`

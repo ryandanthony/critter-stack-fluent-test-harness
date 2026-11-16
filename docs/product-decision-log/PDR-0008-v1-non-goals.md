@@ -1,6 +1,6 @@
 # PDR-0008: v1 non-goals
 
-- **Status:** accepted
+- **Status:** accepted (the NuGet bullet is superseded by [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (v1 scope, No data wipe, CI), [reference/compatibility.md](../reference/compatibility.md) (v1 limits)

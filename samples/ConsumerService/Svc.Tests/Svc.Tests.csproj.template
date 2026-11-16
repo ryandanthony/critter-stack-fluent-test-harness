@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- A stand-in for a consuming service's test project. It is deliberately NOT built with this repo's
-       Directory.Build.props: scripts/check-portability.sh copies it, and a copy of the harness project, into a
-       throwaway directory and builds them there, as the add-to-a-service how-to describes. -->
+       Directory.Build.props: scripts/check-package.sh copies it into a throwaway directory and restores the harness
+       as a NuGet package, as the add-to-a-service how-to describes. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -15,9 +15,7 @@
     <PackageReference Include="WolverineFx.Marten" />
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="CritterStack.TestHarness" />
     <Using Include="Xunit" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\CritterStack.TestHarness\CritterStack.TestHarness.csproj" />
   </ItemGroup>
 </Project>

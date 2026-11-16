@@ -18,9 +18,13 @@ build: restore
 test: build
   dotnet test --solution {{solution}} --no-build --configuration Release --report-xunit-trx --results-directory TestResults
 
-# Copy the harness into a throwaway service (no repo build props) and run that service's scenarios (requires Docker).
-portability:
-  ./scripts/check-portability.sh
+# Pack the harness NuGet package (and symbols) into artifacts/.
+pack: build
+  dotnet pack src/CritterStack.TestHarness/CritterStack.TestHarness.csproj --no-build --configuration Release --output artifacts
+
+# Pack the harness, then install it from a local feed into a throwaway consumer service and run its scenarios (requires Docker).
+package-check: pack
+  ./scripts/check-package.sh
 
 # List product and architecture decision records with their status.
 decisions:

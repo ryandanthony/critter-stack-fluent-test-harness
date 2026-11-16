@@ -5,15 +5,26 @@ on:
     branches: [main]
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the package to nuget.org, tag and create a GitHub release (main only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   packages: read
 
+env:
+  # Deterministic package with source links that point at the built commit (ADR-0013).
+  ContinuousIntegrationBuild: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      majorMinorPatch: ${{ steps.version.outputs.majorMinorPatch }}
 
     steps:
       # Full history: GitVersion needs every commit and tag.
@@ -64,9 +75,9 @@ jobs:
       - name: Test
         run: just test
 
-      # Proves the portability rule: the harness project copied into a service with no repo build props.
-      - name: Portability check
-        run: just portability
+      # Packs CritterStack.TestHarness, then a consumer with no repo build props installs that .nupkg and runs its scenarios.
+      - name: Package check
+        run: just package-check
 
       # Relative links in README, AGENTS.md and docs/ (decision logs, design, plan, user docs) must resolve.
       - name: Docs link check
@@ -79,3 +90,63 @@ jobs:
           name: test-results
           path: TestResults/**/*.trx
           if-no-files-found: warn
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+
+  # Manual only: Actions > Build > Run workflow > publish = true, on main. Never on push or PR.
+  # Needs a nuget.org trusted-publishing policy: owner ryandanthony, repo critterstack-fluent-testharness, workflow build.yml.
+  release:
+    name: Release
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # tag + GitHub release
+      id-token: write   # OIDC token for NuGet trusted publishing
+
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Trusted publishing: exchange the GitHub OIDC token for a short-lived nuget.org API key.
+      - name: NuGet login (OIDC)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ryandanthony
+
+      - name: Publish to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "artifacts/*.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      # The v tag also drives GitVersion for the next build.
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.majorMinorPatch }}
+          name: v${{ needs.build.outputs.majorMinorPatch }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg

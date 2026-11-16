@@ -2,19 +2,25 @@
 
 You have a service that uses Marten and Wolverine and already has an Alba test fixture. These steps add the harness to its test project.
 
-## 1. Copy the project
+## 1. Add the package
 
-Copy `src/CritterStack.TestHarness/` into your repo and add a project reference from your test project:
+Reference `CritterStack.TestHarness` from your test project. With central package management, put the version in `Directory.Packages.props`:
 
 ```xml
-<ProjectReference Include="..\CritterStack.TestHarness\CritterStack.TestHarness.csproj" />
+<PackageVersion Include="CritterStack.TestHarness" Version="x.y.z" />
 ```
 
-Copy the `.cs` and `.csproj` files only, not `bin/` or `obj/`. The project sets its own target framework (`net10.0`), nullable and implicit usings, so it builds without this repo's `Directory.Build.props`; the analyzers and versioning in that file stay here. `scripts/check-portability.sh` (`just portability`) does exactly these steps in a throwaway directory and runs a sample service's scenarios, and CI runs it on every push.
+and the reference, without a version, in the test project:
 
-## 2. Add package versions
+```xml
+<PackageReference Include="CritterStack.TestHarness" />
+```
 
-The harness references three packages. If your repo uses central package management, make sure `Directory.Packages.props` has a version for each:
+Replace `x.y.z` with the latest version on [nuget.org](https://www.nuget.org/packages/CritterStack.TestHarness). Without central package management, put the `Version` on the `PackageReference` instead.
+
+## 2. Check the Critter Stack versions
+
+The package depends on Alba, Marten and WolverineFx, at least the versions it was tested against. If your repo pins any of them lower, NuGet reports a downgrade; raise your pins to at least these:
 
 ```xml
 <PackageVersion Include="Alba" Version="8.5.3" />
@@ -22,7 +28,7 @@ The harness references three packages. If your repo uses central package managem
 <PackageVersion Include="WolverineFx" Version="6.44.0" />
 ```
 
-See [compatibility](../reference/compatibility.md) for the tested versions.
+See [compatibility](../reference/compatibility.md) for the tested versions. `just package-check` in this repo installs the freshly packed package into a sample service with exactly these steps and runs its scenarios, and CI runs it on every push.
 
 ## 3. Check the host
 

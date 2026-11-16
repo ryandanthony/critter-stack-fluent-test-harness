@@ -4,7 +4,7 @@
 
 CritterStack.TestHarness is a fluent Given/When/Then test harness for Marten and Wolverine services. It plugs into a service's existing Alba test host. C# / .NET 10, Marten 9.44, WolverineFx 6.44, Alba 8.5.3, xunit v3, Postgres via Testcontainers.
 
-v1 is built and green in CI. Services adopt it by copying `src/CritterStack.TestHarness/` into their repo ([PDR-0006](docs/product-decision-log/PDR-0006-adopt-by-copying-the-project.md)).
+v1 is built and green in CI. Services adopt it as the `CritterStack.TestHarness` NuGet package ([PDR-0010](docs/product-decision-log/PDR-0010-adopt-as-a-nuget-package.md), [ADR-0013](docs/architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)).
 
 ## Read first
 
@@ -23,7 +23,8 @@ Records are the contract. If your change needs a decision that isn't on record, 
 ```bash
 just build          # Release build, warnings as errors
 just test           # Full suite (needs Docker)
-just portability    # Copy the harness into a throwaway service and run its scenarios (needs Docker)
+just pack           # CritterStack.TestHarness .nupkg + .snupkg into artifacts/
+just package-check  # Pack, install into a throwaway consumer service, run its scenarios (needs Docker)
 just decisions      # PDR/ADR list with statuses
 just docs-check     # Verify relative links in docs/
 ```
@@ -39,12 +40,12 @@ src/
     Stages/                           public stage interfaces
     Internal/                         builder, runner, context, sync, classifier, formatter, Steps/
   CritterStack.TestHarness.Tests/     tests, TestDomain/ (Widget), Infrastructure/ (hosts), DocSamples/
-samples/ConsumerService/              sample service used by scripts/check-portability.sh
+samples/ConsumerService/              sample consumer used by scripts/check-package.sh
 ```
 
 ## Conventions
 
-- **Portability:** the harness project references Alba, Marten and WolverineFx only and sets its own `TargetFramework`/`Nullable`/`ImplicitUsings`. No service-specific knowledge; anything that varies is a `HarnessOptions` field ([ADR-0004](docs/architecture-decision-log/ADR-0004-self-contained-harness-project.md)).
+- **Package:** the harness depends on Alba, Marten and WolverineFx only; build tooling stays `PrivateAssets="all"`. No service-specific knowledge; anything that varies is a `HarnessOptions` field. Public API changes follow SemVer ([ADR-0013](docs/architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)). Publishing is a manual `workflow_dispatch` with `publish: true`.
 - **Packages:** central package management, exact pins in `src/Directory.Packages.props` ([ADR-0002](docs/architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md)). Bump `samples/ConsumerService/Directory.Packages.props.template` with it.
 - **Quality:** warnings as errors, `FestinaLente.CodeStandards` + StyleCop, file headers on every `.cs`, XML docs on every public member ([ADR-0011](docs/architecture-decision-log/ADR-0011-build-quality-versioning-and-ci.md)).
 - **Tests:** real Postgres, one schema per host, every test has a `business_value` trait ([ADR-0003](docs/architecture-decision-log/ADR-0003-real-postgres-test-hosts.md)).

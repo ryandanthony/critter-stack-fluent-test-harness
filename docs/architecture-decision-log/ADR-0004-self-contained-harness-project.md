@@ -1,6 +1,6 @@
 # ADR-0004: The harness is one self-contained project with three dependencies
 
-- **Status:** accepted
+- **Status:** superseded by [ADR-0013](./ADR-0013-ship-the-harness-as-a-nuget-package.md)
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Portability rule, Files: harness library, Risks: verified portability), commit `1e46caa`

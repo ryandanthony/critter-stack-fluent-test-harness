@@ -1,6 +1,6 @@
 # PDR-0006: Services adopt the harness by copying the project
 
-- **Status:** accepted
+- **Status:** superseded by [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md)
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Portability rule, Risks: verified portability), [how-to/add-to-a-service.md](../how-to/add-to-a-service.md)
