@@ -2,37 +2,41 @@
 
 v1 is built: every todo in the original plan is done and CI is green. This plan records what v1 delivered and lists the candidate packets for what comes next. A packet that needs a decision not on record stops and gets a PDR or ADR written first ([ADR-0001](../architecture-decision-log/ADR-0001-decision-logs-design-and-plan.md)).
 
-## Starting point (2026-11-16)
+## Starting point (2026-11-17)
 
-- Harness library: about 2,100 lines in `src/CritterStack.TestHarness/`, public API as in [design/01-harness-design.md](../design/01-harness-design.md#fluent-stage-interfaces).
-- Test suite: 135 tests (about 3,300 lines, 12 s locally), real Postgres via Testcontainers, three hosts (no daemon, daemon, poison daemon) ([ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md)). Doc samples and API coverage enforced ([ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md)).
-- CI (`build.yml`) green on GitHub for everything pushed. Packs `CritterStack.TestHarness` on every run and proves it installs into a consumer ([ADR-0013](../architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)). Not published yet, no tags.
-- No service uses the harness yet.
+- Harness library: about 2,700 lines in `src/CritterStack.TestHarness/`, public API as in [design/01-harness-design.md](../design/01-harness-design.md#fluent-stage-interfaces).
+- Test suite: 159 tests (about 3,600 lines), real Postgres via Testcontainers, three hosts (no daemon, daemon, poison daemon) ([ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md)). Doc samples and API coverage enforced ([ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md)).
+- CI (`build.yml`) green on GitHub for everything pushed. Packs `CritterStack.TestHarness` on every run and proves it installs into a consumer ([ADR-0013](../architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)).
+- Published on nuget.org: **1.3.3** (2026-11-17, first publish, manual) and **1.3.4** (2026-11-17, first automatic release, [ADR-0017](../architecture-decision-log/ADR-0017-release-automatically-on-push-to-main.md)). Each version has a matching `v*` tag and GitHub release.
+- Pins still Marten 9.44.0, WolverineFx 6.44.0, Alba 8.5.3. Current upstream on 2026-11-17: Marten 9.62.0, WolverineFx 6.64.2, Alba 9.0.0 (P04).
+- No service uses the harness yet (P01).
 
 ## Packets
 
-Status: **ready** (fully specified), **outline** (written in full when it is next in line), **needs decision** (a record must be written first).
+Status: **ready** (fully specified), **outline** (written in full when it is next in line), **needs decision** (a record must be written first). **Shipped in** is the first nuget.org version that contains the packet; a dash means it isn't done or doesn't change the package.
 
-| Packet | Outcome | Implements | Depends on | Status |
-|---|---|---|---|---|
-| P01 First consumer | One real service (Mise, which runs Marten + Wolverine, [mise ADR-0012](https://github.com/ryandanthony/mise/blob/main/docs/architecture-decision-log/ADR-0012-marten-and-wolverine.md)) adds the package and has at least one scenario per handler type green in its CI | PDR-0010 | P03 | outline |
-| P02 Tutorial walk-through | Someone new follows `tutorials/first-scenario.md` by hand from a clean clone; every gap found is fixed in the page and its `DocSamples/` test | PDR-0009 | none | outline |
-| P03 First publish | Resolve ADR-0013's **Open** item (repo visibility vs feed), add the nuget.org trusted-publishing policy, run the release workflow; `CritterStack.TestHarness` is installable | ADR-0013 | none | done (v1.3.3 on nuget.org, 2026-11-17) |
-| P04 Critter Stack upgrade | Bump Marten, Wolverine and Alba to current; any classifier or sync behaviour change caught by tests is handled and recorded (new ADR superseding ADR-0002 if pins change materially) | ADR-0002, 0007, 0008 | none | outline |
-| P05 NuGet package | Packable project, `just pack`, `just package-check`, CI artifact and manual release job | PDR-0010, ADR-0013 | none | done |
-| P06 String stream ids | `string` overloads of every stream method, second test host | new PDR superseding PDR-0008 | none | needs decision |
-| P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision |
-| P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done |
-| P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change. Deploy waits for Pages (ADR-0015 **Open**) | PDR-0012, ADR-0015 | none | done (live at https://ryandanthony.github.io/critter-stack-fluent-test-harness/) |
-| P10 Projection-error flake | Apply errors the daemon hits outside the forced catch-up fail the next action, so `ProjectionErrorTests` is stable on 1-CPU runners (CI was red on `main`) | ADR-0016 | none | done |
-| P11 Automatic releases | Every push to `main` with a `feat`/`fix`/`perf`/breaking commit since the last tag publishes to nuget.org, tags and creates a GitHub release. GitVersion no longer burns numbers on docs commits. `main` protected | ADR-0017 | P03 | done |
+| Packet | Outcome | Implements | Depends on | Status | Shipped in |
+|---|---|---|---|---|---|
+| P01 First consumer | One real service (Mise, which runs Marten + Wolverine, [mise ADR-0012](https://github.com/ryandanthony/mise/blob/main/docs/architecture-decision-log/ADR-0012-marten-and-wolverine.md)) adds the package and has at least one scenario per handler type green in its CI | PDR-0010 | P03 (done) | outline, not started | - |
+| P02 Tutorial walk-through | Someone new follows `tutorials/first-scenario.md` by hand from a clean clone; every gap found is fixed in the page and its `DocSamples/` test | PDR-0009 | none | outline, not started | - |
+| P03 First publish | Resolve ADR-0013's **Open** item (repo visibility vs feed), add the nuget.org trusted-publishing policy, run the release workflow; `CritterStack.TestHarness` is installable | ADR-0013 | none | done 2026-11-17 | 1.3.3 |
+| P04 Critter Stack upgrade | Bump Marten, Wolverine and Alba to current; any classifier or sync behaviour change caught by tests is handled and recorded (new ADR superseding ADR-0002 if pins change materially) | ADR-0002, 0007, 0008 | none | outline, not started (Alba 9.0.0 is a major bump) | - |
+| P05 NuGet package | Packable project, `just pack`, `just package-check`, CI artifact and manual release job | PDR-0010, ADR-0013 | none | done | 1.3.3 |
+| P06 String stream ids | `string` overloads of every stream method, second test host | new PDR superseding PDR-0008 | none | needs decision | - |
+| P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision | - |
+| P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done | 1.3.3 |
+| P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change, deployed to Pages | PDR-0012, ADR-0015 | none | done, live at https://ryandanthony.github.io/critter-stack-fluent-test-harness/ | - (not in the package) |
+| P10 Projection-error flake | Apply errors the daemon hits outside the forced catch-up fail the next action, so `ProjectionErrorTests` is stable on 1-CPU runners (CI was red on `main`) | ADR-0016 | none | done | 1.3.3 |
+| P11 Automatic releases | Every push to `main` with a `feat`/`fix`/`perf`/breaking commit since the last tag publishes to nuget.org, tags and creates a GitHub release. GitVersion no longer burns numbers on docs commits. `main` protected | ADR-0017 | P03 | done | - (CI only; first automatic release was 1.3.4) |
+
+1.3.4 adds one package change over 1.3.3: the nuget.org project URL points at the docs site (`c5808f9`).
 
 ### Outlines
 
 - **P01 First consumer.** Follow `how-to/add-to-a-service.md` literally in the consuming repo. Anything the guide misses is a doc fix here. Anything the harness can't express is either a `HarnessOptions` field (ADR-0013) or a new record. Done when the consumer's CI runs the scenarios.
 - **P02 Tutorial walk-through.** Today the tutorial is only proven by `FirstScenarioSamples`; nobody has read it as a newcomer.
-- **P03 First publish.** Decided 2026-11-16: public repo + nuget.org. Make the repo public, on nuget.org add a trusted-publishing policy (owner `ryandanthony`, repo `critter-stack-fluent-test-harness`, workflow `build.yml`), then Actions > Build > Run workflow with `publish` ticked. The first version is whatever GitVersion computes (1.3.x on 2026-11-16, check with `dotnet gitversion /showvariable SemVer`).
-- **P04 Upgrade.** Run `dotnet list package --outdated`, bump `Directory.Packages.props` and `samples/ConsumerService/Directory.Packages.props.template` together, run `just test` and `just package-check`, update [reference/compatibility.md](../reference/compatibility.md).
+- **P03 First publish.** Done: repo made public and renamed `critter-stack-fluent-test-harness`, trusted-publishing policy added, 1.3.3 published by a manual run on 2026-11-17.
+- **P04 Upgrade.** Run `dotnet list package --outdated`, bump `Directory.Packages.props` and `samples/ConsumerService/Directory.Packages.props.template` together, run `just test` and `just package-check`, update [reference/compatibility.md](../reference/compatibility.md). On 2026-11-17 that means Marten 9.44.0 to 9.62.0, WolverineFx (and `.Http`, `.Marten`, `.RuntimeCompilation`) 6.44.0 to 6.64.2, Alba 8.5.3 to 9.0.0. Alba is a major version, so read its breaking changes first and expect a new ADR superseding ADR-0002.
 
 ## v1 build log
 
