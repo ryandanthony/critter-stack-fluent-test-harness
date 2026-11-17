@@ -40,6 +40,8 @@ Where the method names an event or aggregate type, give the id type as well (`Th
 
 A typed id must wrap a `Guid` or a `string` in a single public property, and that kind has to match the store's stream identity. A typed id and the value it wraps name the same stream, so `ThenAppendedCount(id.Value, 1)` works too.
 
+Events and read models that hold a typed id also need it to round-trip through the store's JSON serializer. Vogen and StronglyTypedId generate converters for this. A hand-written wrapper with only a private constructor (and a static `From`) and no converter is stored as `{"Value":null}`, so predicates on the id fail and the failure message shows the null.
+
 ## When the id is the wrong kind
 
 A `string` on a Guid store, or a `Guid` on a string-keyed store, fails before any step runs:
