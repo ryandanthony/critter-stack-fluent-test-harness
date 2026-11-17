@@ -28,7 +28,7 @@ internal sealed class WhenCommandStep : ISnapshottingStep
     }
 
     /// <inheritdoc/>
-    public HashSet<StreamKey> SnapshotIds { get; } = [];
+    public HashSet<StreamAddress> SnapshotIds { get; } = [];
 
     /// <inheritdoc/>
     public StepKind Kind => StepKind.Action;

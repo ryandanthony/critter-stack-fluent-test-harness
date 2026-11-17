@@ -136,4 +136,15 @@ public interface IThenStage<out TSelf> : IScenario
     /// <param name="request">Configures the Alba request. Called when the step runs.</param>
     /// <returns>The HTTP stage, whose Thens refer to this request.</returns>
     IHttpStage WhenHttp(Action<Alba.Scenario> request);
+
+    /// <summary>
+    /// Switches the Marten store that the following stream steps use. See <see cref="IGivenStage.InStore{TStore}"/>.
+    /// </summary>
+    /// <typeparam name="TStore">An ancillary store registered with <c>AddMartenStore&lt;TStore&gt;()</c>, or
+    /// <see cref="Marten.IDocumentStore"/> for the main store.</typeparam>
+    /// <returns>The same stage.</returns>
+    /// <exception cref="InvalidOperationException"><typeparamref name="TStore"/> isn't registered in the host.</exception>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The store is chosen by type; there is no value to infer it from.")]
+    TSelf InStore<TStore>()
+        where TStore : class, Marten.IDocumentStore;
 }

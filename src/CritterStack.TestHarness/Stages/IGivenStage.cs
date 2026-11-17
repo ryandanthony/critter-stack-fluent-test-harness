@@ -120,4 +120,19 @@ public interface IGivenStage
     /// Called when the step runs. Assert the status with <c>ThenStatusCode</c>, not Alba's <c>StatusCodeShouldBe</c>.</param>
     /// <returns>The HTTP stage, whose Thens refer to this request.</returns>
     IHttpStage WhenHttp(Action<Alba.Scenario> request);
+
+    /// <summary>
+    /// Switches the Marten store that the following stream steps (<c>GivenStream</c>, <c>ThenStream*</c>,
+    /// <c>ThenAppended*</c>) use, until the next <c>InStore</c>. A scenario starts on the host's main store, and
+    /// <c>InStore&lt;IDocumentStore&gt;()</c> switches back to it. The choice carries across <c>When</c>,
+    /// <c>WhenQuery</c> and <c>WhenHttp</c>. Every store a scenario names is synced before each action. Commands and
+    /// queries aren't affected: Wolverine's <c>[MartenStore]</c> routing picks a handler's store.
+    /// </summary>
+    /// <typeparam name="TStore">An ancillary store registered with <c>AddMartenStore&lt;TStore&gt;()</c>, or
+    /// <see cref="Marten.IDocumentStore"/> for the main store.</typeparam>
+    /// <returns>The Given stage.</returns>
+    /// <exception cref="InvalidOperationException"><typeparamref name="TStore"/> isn't registered in the host.</exception>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The store is chosen by type; there is no value to infer it from.")]
+    IGivenStage InStore<TStore>()
+        where TStore : class, Marten.IDocumentStore;
 }

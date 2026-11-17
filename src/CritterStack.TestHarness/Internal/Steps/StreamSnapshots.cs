@@ -18,17 +18,17 @@ internal static class StreamSnapshots
     /// <param name="ids">The stream ids to snapshot.</param>
     /// <param name="cancellationToken">Cancels the reads.</param>
     /// <returns>A task that completes when every snapshot is stored.</returns>
-    internal static async Task TakeAsync(ScenarioContext context, IReadOnlyCollection<StreamKey> ids, CancellationToken cancellationToken)
+    internal static async Task TakeAsync(ScenarioContext context, IReadOnlyCollection<StreamAddress> ids, CancellationToken cancellationToken)
     {
         if (ids.Count == 0)
         {
             return;
         }
 
-        await using var session = context.OpenQuerySession();
         foreach (var id in ids)
         {
-            var state = await id.FetchStateAsync(session, cancellationToken).ConfigureAwait(false);
+            await using var session = context.OpenQuerySession(id.Store);
+            var state = await id.Key.FetchStateAsync(session, cancellationToken).ConfigureAwait(false);
             context.Snapshots[id] = state?.Version ?? 0;
         }
     }

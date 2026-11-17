@@ -6,6 +6,7 @@
 
 using System.Text;
 using JasperFx.Events;
+using Marten;
 
 namespace CritterStack.TestHarness.Internal;
 
@@ -19,9 +20,10 @@ internal static class PayloadFormatter
     /// Lists events as <c>v{version} {type} {json}</c>, one per line.
     /// </summary>
     /// <param name="context">The scenario context, for the serializer.</param>
+    /// <param name="store">The store the events came from, whose serializer stored them.</param>
     /// <param name="events">The events.</param>
     /// <returns>The formatted list, or <c>(no events)</c>.</returns>
-    internal static string FormatEvents(ScenarioContext context, IReadOnlyList<IEvent> events)
+    internal static string FormatEvents(ScenarioContext context, StoreRef store, IReadOnlyList<IEvent> events)
     {
         if (events.Count == 0)
         {
@@ -33,7 +35,7 @@ internal static class PayloadFormatter
         {
             builder.Append("  v").Append(e.Version).Append(' ')
                 .Append(Failure.TypeName(e.Data.GetType())).Append(' ')
-                .AppendLine(Json(context, e.Data));
+                .AppendLine(Json(context.StoreFor(store), e.Data));
         }
 
         return builder.ToString().TrimEnd();
@@ -58,12 +60,20 @@ internal static class PayloadFormatter
     }
 
     /// <summary>
-    /// Serializes a value with the store's serializer.
+    /// Serializes a value with the main store's serializer.
     /// </summary>
     /// <param name="context">The scenario context, for the serializer.</param>
     /// <param name="value">The value.</param>
     /// <returns>The JSON, or <c>null</c>.</returns>
-    internal static string Json(ScenarioContext context, object? value)
+    internal static string Json(ScenarioContext context, object? value) => Json(context.Store, value);
+
+    /// <summary>
+    /// Serializes a value with <paramref name="store"/>'s serializer.
+    /// </summary>
+    /// <param name="store">The store whose serializer to use.</param>
+    /// <param name="value">The value.</param>
+    /// <returns>The JSON, or <c>null</c>.</returns>
+    internal static string Json(IDocumentStore store, object? value)
     {
         if (value is null)
         {
@@ -72,7 +82,7 @@ internal static class PayloadFormatter
 
         try
         {
-            return context.Store.Options.Serializer().ToJson(value);
+            return store.Options.Serializer().ToJson(value);
         }
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or ArgumentException)
         {

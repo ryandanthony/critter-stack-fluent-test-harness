@@ -36,39 +36,39 @@ internal sealed class QueryStage<TResponse> : IQueryStage<TResponse>
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+        Add(StreamAssertionStep.Has(_builder.Store.Address(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+        Add(StreamAssertionStep.Has(_builder.Store.Address(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.Has(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
+        Add(StreamAssertionStep.Has(_builder.Store.TypedAddress(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasNoEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+        Add(StreamAssertionStep.HasNo(_builder.Store.Address(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasNoEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+        Add(StreamAssertionStep.HasNo(_builder.Store.Address(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasNoEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.HasNo(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
+        Add(StreamAssertionStep.HasNo(_builder.Store.TypedAddress(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamEventCount(Guid id, int expected) =>
-        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+        Add(StreamAssertionStep.ForCount(_builder.Store.Address(id), StreamScope.Whole, expected));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamEventCount(string id, int expected) =>
-        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+        Add(StreamAssertionStep.ForCount(_builder.Store.Address(id), StreamScope.Whole, expected));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamEventCount<TId>(TId id, int expected) =>
-        Add(StreamAssertionStep.ForCount(StreamKey.ForTyped(id), StreamScope.Whole, expected));
+        Add(StreamAssertionStep.ForCount(_builder.Store.TypedAddress(id), StreamScope.Whole, expected));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenThrows<TException>(Func<TException, bool>? predicate = null)
@@ -84,6 +84,15 @@ internal sealed class QueryStage<TResponse> : IQueryStage<TResponse>
 
     /// <inheritdoc/>
     public IHttpStage WhenHttp(Action<Alba.Scenario> request) => _builder.WhenHttp(request);
+
+    /// <inheritdoc/>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "Implements IThenStage.InStore<TStore>.")]
+    public IQueryStage<TResponse> InStore<TStore>()
+        where TStore : class, Marten.IDocumentStore
+    {
+        _builder.Store.MoveTo<TStore>();
+        return this;
+    }
 
     /// <inheritdoc/>
     public Task RunAsync(CancellationToken cancellationToken = default) => _builder.RunAsync(cancellationToken);

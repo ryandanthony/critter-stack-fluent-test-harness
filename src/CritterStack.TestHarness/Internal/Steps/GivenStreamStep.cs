@@ -17,25 +17,25 @@ internal sealed class GivenStreamStep : IStreamStep
     /// <summary>
     /// Initializes a new instance of the <see cref="GivenStreamStep"/> class.
     /// </summary>
-    /// <param name="id">The stream id.</param>
+    /// <param name="stream">The stream and the store it lives in.</param>
     /// <param name="events">Builds the events, from the id in the form the test passed it.</param>
     /// <param name="aggregateType">The aggregate type to start the stream as, or null.</param>
-    internal GivenStreamStep(StreamKey id, Func<object[]> events, Type? aggregateType)
+    internal GivenStreamStep(StreamAddress stream, Func<object[]> events, Type? aggregateType)
     {
-        StreamId = id;
+        Stream = stream;
         _events = events;
         _aggregateType = aggregateType;
     }
 
     /// <inheritdoc/>
-    public StreamKey StreamId { get; }
+    public StreamAddress Stream { get; }
 
     /// <inheritdoc/>
     public StepKind Kind => StepKind.Given;
 
     /// <inheritdoc/>
     public string Describe() =>
-        _aggregateType is null ? $"GivenStream({StreamId})" : $"GivenStream<{Failure.TypeName(_aggregateType)}>({StreamId})";
+        (_aggregateType is null ? $"GivenStream({Stream.Key})" : $"GivenStream<{Failure.TypeName(_aggregateType)}>({Stream.Key})") + Stream.StoreSuffix;
 
     /// <inheritdoc/>
     public async Task ExecuteAsync(ScenarioContext context, CancellationToken cancellationToken)
@@ -52,14 +52,14 @@ internal sealed class GivenStreamStep : IStreamStep
 
         try
         {
-            await using var session = context.OpenSession();
-            if (context.StartedStreams.Contains(StreamId))
+            await using var session = context.OpenSession(Stream.Store);
+            if (context.StartedStreams.Contains(Stream))
             {
-                StreamId.Append(session, events);
+                Stream.Key.Append(session, events);
             }
             else
             {
-                StreamId.StartStream(session, _aggregateType, events);
+                Stream.Key.StartStream(session, _aggregateType, events);
             }
 
             await session.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -76,7 +76,7 @@ internal sealed class GivenStreamStep : IStreamStep
                 ex);
         }
 
-        context.StartedStreams.Add(StreamId);
+        context.StartedStreams.Add(Stream);
         context.ProjectionsDirty = true;
     }
 }
