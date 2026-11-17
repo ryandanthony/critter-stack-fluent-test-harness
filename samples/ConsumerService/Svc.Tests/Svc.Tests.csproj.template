@@ -12,6 +12,11 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- A real service references these itself (its app and Alba fixture), so its versions win over the harness's
+         minimums. Without them the harness's floor versions would be resolved. -->
+    <PackageReference Include="Alba" />
+    <PackageReference Include="Marten" />
+    <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.Marten" />
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
     <PackageReference Include="Testcontainers.PostgreSql" />

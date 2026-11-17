@@ -3,18 +3,35 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
+  <!-- Critter Stack versions (ADR-0018).
+       Floor: the oldest versions the harness supports. The library always compiles against these, so they are the
+       package's minimum dependency versions, with no upper bound. Raise a floor only when the harness needs it.
+       Tested: what the test project runs that floor-built library against. Defaults to the floor; `just test-latest`
+       (and the Compatibility workflow) set them to the newest stable releases through the environment. -->
+  <PropertyGroup Label="Critter Stack floor">
+    <MartenFloor>9.44.0</MartenFloor>
+    <WolverineFloor>6.44.0</WolverineFloor>
+    <AlbaFloor>8.5.3</AlbaFloor>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Critter Stack tested">
+    <MartenVersion Condition="'$(MartenVersion)' == ''">$(MartenFloor)</MartenVersion>
+    <WolverineVersion Condition="'$(WolverineVersion)' == ''">$(WolverineFloor)</WolverineVersion>
+    <AlbaVersion Condition="'$(AlbaVersion)' == ''">$(AlbaFloor)</AlbaVersion>
+  </PropertyGroup>
+
   <ItemGroup Label="Code Quality">
     <PackageVersion Include="FestinaLente.CodeStandards" Version="1.1.10" />
     <PackageVersion Include="GitVersion.MsBuild" Version="6.8.2" />
   </ItemGroup>
 
   <ItemGroup Label="Critter Stack">
-    <PackageVersion Include="Marten" Version="9.44.0" />
-    <PackageVersion Include="WolverineFx" Version="6.44.0" />
-    <PackageVersion Include="WolverineFx.Marten" Version="6.44.0" />
-    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.44.0" />
-    <PackageVersion Include="WolverineFx.Http" Version="6.44.0" />
-    <PackageVersion Include="Alba" Version="8.5.3" />
+    <PackageVersion Include="Marten" Version="$(MartenVersion)" />
+    <PackageVersion Include="WolverineFx" Version="$(WolverineVersion)" />
+    <PackageVersion Include="WolverineFx.Marten" Version="$(WolverineVersion)" />
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="$(WolverineVersion)" />
+    <PackageVersion Include="WolverineFx.Http" Version="$(WolverineVersion)" />
+    <PackageVersion Include="Alba" Version="$(AlbaVersion)" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

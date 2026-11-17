@@ -2,7 +2,7 @@
 
 ## Overview
 
-CritterStack.TestHarness is a fluent Given/When/Then test harness for Marten and Wolverine services. It plugs into a service's existing Alba test host. C# / .NET 10, Marten 9.44, WolverineFx 6.44, Alba 8.5.3, xunit v3, Postgres via Testcontainers.
+CritterStack.TestHarness is a fluent Given/When/Then test harness for Marten and Wolverine services. It plugs into a service's existing Alba test host. C# / .NET 10, Marten >= 9.44, WolverineFx >= 6.44, Alba >= 8.5.3 (floor, also tested on latest), xunit v3, Postgres via Testcontainers.
 
 v1 is built and green in CI. Services adopt it as the `CritterStack.TestHarness` NuGet package ([PDR-0010](docs/product-decision-log/PDR-0010-adopt-as-a-nuget-package.md), [ADR-0013](docs/architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)).
 
@@ -25,6 +25,7 @@ just build          # Release build, warnings as errors
 just test           # Full suite (needs Docker)
 just pack           # CritterStack.TestHarness .nupkg + .snupkg into artifacts/
 just package-check  # Pack, install into a throwaway consumer service, run its scenarios (needs Docker)
+just test-latest    # Suite against the newest stable Marten/Wolverine/Alba (also package-check-latest)
 just decisions      # PDR/ADR list with statuses
 just docs-check     # Verify relative links in docs/
 just docs-site      # Build the Docusaurus site from docs/ (needs Node 20)
@@ -48,7 +49,7 @@ samples/ConsumerService/              sample consumer used by scripts/check-pack
 ## Conventions
 
 - **Package:** the harness depends on Alba, Marten and WolverineFx only; build tooling stays `PrivateAssets="all"`. No service-specific knowledge; anything that varies is a `HarnessOptions` field. Public API changes follow SemVer ([ADR-0013](docs/architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)). Publishing is a manual `workflow_dispatch` with `publish: true`.
-- **Packages:** central package management, exact pins in `src/Directory.Packages.props` ([ADR-0002](docs/architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md)). Bump `samples/ConsumerService/Directory.Packages.props.template` with it.
+- **Packages:** central package management in `src/Directory.Packages.props` ([ADR-0002](docs/architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md)). Marten, WolverineFx and Alba are a floor the library builds against (the package minimum, open ended), tested on the floor in `build.yml` and on the latest releases in `compatibility.yml`. Don't bump them to stay current. Raise a floor only when the harness needs it, together with the template's defaults in `samples/ConsumerService/Directory.Packages.props.template`, as a `feat!:` ([ADR-0018](docs/architecture-decision-log/ADR-0018-critter-stack-floor-and-latest.md)). Test and sample code must build on both version sets.
 - **Quality:** warnings as errors, `FestinaLente.CodeStandards` + StyleCop, file headers on every `.cs`, XML docs on every public member ([ADR-0011](docs/architecture-decision-log/ADR-0011-build-quality-versioning-and-ci.md)).
 - **Tests:** real Postgres, one schema per host, every test has a `business_value` trait ([ADR-0003](docs/architecture-decision-log/ADR-0003-real-postgres-test-hosts.md)).
 - **Docs:** a public API change updates `docs/reference/` and any affected tutorial/how-to sample and its `DocSamples/` test in the same PR ([ADR-0012](docs/architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md)).

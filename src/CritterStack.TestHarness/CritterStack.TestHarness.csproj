@@ -28,10 +28,12 @@
     <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
+  <!-- Always the floor (ADR-0018): these become the package's minimum versions, open-ended, so a consumer can run any
+       newer release. The test project runs this same floor-built assembly against the tested versions. -->
   <ItemGroup>
-    <PackageReference Include="Alba" />
-    <PackageReference Include="Marten" />
-    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="Alba" VersionOverride="$(AlbaFloor)" />
+    <PackageReference Include="Marten" VersionOverride="$(MartenFloor)" />
+    <PackageReference Include="WolverineFx" VersionOverride="$(WolverineFloor)" />
   </ItemGroup>
 
   <ItemGroup>

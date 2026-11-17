@@ -1,14 +1,20 @@
 <Project>
-  <!-- The consuming service's own central package versions (step 2 of the add-to-a-service how-to). -->
+  <!-- The consuming service's own central package versions (step 2 of the add-to-a-service how-to).
+       A real service pins its own versions here. scripts/check-package.sh runs the consumer twice, once on the
+       harness's floor versions (the defaults below) and once on the newest stable releases, by setting
+       MartenVersion, WolverineVersion and AlbaVersion in the environment (ADR-0018). -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <MartenVersion Condition="'$(MartenVersion)' == ''">9.44.0</MartenVersion>
+    <WolverineVersion Condition="'$(WolverineVersion)' == ''">6.44.0</WolverineVersion>
+    <AlbaVersion Condition="'$(AlbaVersion)' == ''">8.5.3</AlbaVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Alba" Version="8.5.3" />
-    <PackageVersion Include="Marten" Version="9.44.0" />
-    <PackageVersion Include="WolverineFx" Version="6.44.0" />
-    <PackageVersion Include="WolverineFx.Marten" Version="6.44.0" />
-    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.44.0" />
+    <PackageVersion Include="Alba" Version="$(AlbaVersion)" />
+    <PackageVersion Include="Marten" Version="$(MartenVersion)" />
+    <PackageVersion Include="WolverineFx" Version="$(WolverineVersion)" />
+    <PackageVersion Include="WolverineFx.Marten" Version="$(WolverineVersion)" />
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="$(WolverineVersion)" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />

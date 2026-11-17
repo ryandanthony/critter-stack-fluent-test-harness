@@ -6,7 +6,7 @@ A standalone, reusable, fluent Given/When/Then test harness for Marten and Wolve
 - **Grounded in:** PDR-0001 to PDR-0009, ADR-0002 to ADR-0012 (see the [map](./README.md#where-each-record-lands)).
 - **Build log:** the todo list that drove v1 is in [implementation-plan/00-overview.md](../implementation-plan/00-overview.md#v1-build-log).
 
-The records are the contract. Where this document and a record disagree, the record wins and this document is fixed. Verification notes ("verified") refer to Marten 9.44, Wolverine 6.44 and Alba 8.5.3 ([ADR-0002](../architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md)).
+The records are the contract. Where this document and a record disagree, the record wins and this document is fixed. Verification notes ("verified") refer to Marten 9.44, Wolverine 6.44 and Alba 8.5.3 ([ADR-0002](../architecture-decision-log/ADR-0002-pinned-critter-stack-versions.md)), which are now the floor. The same tests also pass on the latest releases (Marten 9.62.0, WolverineFx 6.64.2, Alba 9.0.0 on 2026-11-17, [ADR-0018](../architecture-decision-log/ADR-0018-critter-stack-floor-and-latest.md)).
 
 ## Target API
 
@@ -274,16 +274,16 @@ Repo scaffolding:
   ```
 
   GitHub Packages needs authentication even for reads. Locally, restore needs a GitHub token with `read:packages` stored for the `github` source (`dotnet nuget update source github --username <user> --password <token> --store-password-in-clear-text`); CI uses `GITHUB_TOKEN`.
-- `src/Directory.Packages.props`: central package versions, pinned to the latest stable releases (as of 2026-10-01):
+- `src/Directory.Packages.props`: central package versions. Marten, WolverineFx and Alba have a **floor** (`MartenFloor`, `WolverineFloor`, `AlbaFloor`) that the library always builds against, so it is the package's open-ended minimum, and **tested** versions (`MartenVersion`, `WolverineVersion`, `AlbaVersion`) that default to the floor and are set to the newest stable releases by `just test-latest` and `compatibility.yml` ([ADR-0018](../architecture-decision-log/ADR-0018-critter-stack-floor-and-latest.md)). Every `WolverineFx.*` package uses `WolverineVersion`. Everything else is an exact pin:
 
   | Package | Version |
   |---|---|
-  | Marten | 9.44.0 |
-  | WolverineFx | 6.44.0 |
-  | WolverineFx.Marten | 6.44.0 |
-  | Alba | 8.5.3 |
+  | Marten | floor 9.44.0 |
+  | WolverineFx | floor 6.44.0 |
+  | WolverineFx.Marten | floor 6.44.0 |
+  | Alba | floor 8.5.3 |
   | Testcontainers.PostgreSql | 4.15.0 |
-  | WolverineFx.RuntimeCompilation | 6.44.0 |
+  | WolverineFx.RuntimeCompilation | floor 6.44.0 |
   | xunit.v3 (needed for assembly fixtures) | 4.0.1 |
   | xunit.runner.visualstudio | 4.0.0 |
   | Microsoft.NET.Test.Sdk | 18.10.1 |

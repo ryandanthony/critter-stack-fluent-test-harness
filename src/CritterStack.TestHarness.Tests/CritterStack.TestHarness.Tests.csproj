@@ -4,7 +4,12 @@
     <RootNamespace>CritterStack.TestHarness.Tests</RootNamespace>
   </PropertyGroup>
 
+  <!-- Direct references at the tested versions (ADR-0018), so they win over the library's floor and the suite runs the
+       floor-built harness against them, as a consumer on newer versions would. -->
   <ItemGroup>
+    <PackageReference Include="Alba" />
+    <PackageReference Include="Marten" />
+    <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.Marten" />
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
     <PackageReference Include="WolverineFx.Http" />

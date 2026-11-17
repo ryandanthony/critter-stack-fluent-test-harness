@@ -20,7 +20,7 @@ Replace `x.y.z` with the latest version on [nuget.org](https://www.nuget.org/pac
 
 ## 2. Check the Critter Stack versions
 
-The package depends on Alba, Marten and WolverineFx, at least the versions it was tested against. If your repo pins any of them lower, NuGet reports a downgrade; raise your pins to at least these:
+The package depends on Alba, Marten and WolverineFx with a minimum version and no upper bound, so newer releases (including Alba 9) are fine and your service's versions win. Only if your repo pins any of them lower does NuGet report a downgrade. In that case raise your pins to at least these:
 
 ```xml
 <PackageVersion Include="Alba" Version="8.5.3" />
@@ -28,7 +28,7 @@ The package depends on Alba, Marten and WolverineFx, at least the versions it wa
 <PackageVersion Include="WolverineFx" Version="6.44.0" />
 ```
 
-See [compatibility](../reference/compatibility.md) for the tested versions. `just package-check` in this repo installs the freshly packed package into a sample service with exactly these steps and runs its scenarios, and CI runs it on every push.
+See [compatibility](../reference/compatibility.md) for the tested versions. `just package-check` in this repo installs the freshly packed package into a sample service with exactly these steps and runs its scenarios. CI runs it on every push at these minimums, and again against the newest stable releases.
 
 ## 3. Check the host
 
