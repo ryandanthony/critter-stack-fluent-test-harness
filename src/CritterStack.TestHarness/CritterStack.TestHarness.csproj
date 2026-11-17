@@ -17,7 +17,7 @@
     <PackageTags>marten;wolverine;alba;critterstack;testing;event-sourcing;given-when-then</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/ryandanthony/critter-stack-fluent-test-harness</PackageProjectUrl>
+    <PackageProjectUrl>https://ryandanthony.github.io/critter-stack-fluent-test-harness/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ryandanthony/critter-stack-fluent-test-harness</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
