@@ -33,6 +33,7 @@ internal static class ScenarioRunner
         PlanSnapshots(steps);
 
         var context = new ScenarioContext(host, options, tenantId);
+        CheckStreamIdentity(steps, context);
         using var shardFailures = await ShardFailureWatcher.StartAsync(host, options, context.Store).ConfigureAwait(false);
         context.ShardFailures = shardFailures;
         for (var i = 0; i < steps.Count; i++)
@@ -90,6 +91,23 @@ internal static class ScenarioRunner
             else
             {
                 // Givens and other Thens need no planning.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fails before anything runs if a stream step's id is a Guid on a store keyed by string, or the reverse.
+    /// Marten doesn't catch every case itself (<c>FetchStreamStateAsync</c> with a string on a Guid store returns
+    /// null), and its messages vary by call (ADR-0019).
+    /// </summary>
+    private static void CheckStreamIdentity(IReadOnlyList<IScenarioStep> steps, ScenarioContext context)
+    {
+        var identity = context.Store.Options.Events.StreamIdentity;
+        for (var i = 0; i < steps.Count; i++)
+        {
+            if (steps[i] is IStreamStep stream && stream.StreamId.Mismatch(identity) is { } reason)
+            {
+                throw Failure.Create($"step {i + 1} {stream.Describe()}", reason);
             }
         }
     }

@@ -52,8 +52,7 @@ internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
     public IGivenStage GivenStream(Guid id, Func<Guid, object[]> events)
     {
         ArgumentNullException.ThrowIfNull(events);
-        _steps.Add(new GivenStreamStep(id, events, (session, streamId, e) => session.Events.StartStream(streamId, e), string.Empty));
-        return this;
+        return Given(StreamKey.For(id), () => events(id), null);
     }
 
     /// <inheritdoc/>
@@ -62,12 +61,39 @@ internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
         where TAggregate : class
     {
         ArgumentNullException.ThrowIfNull(events);
-        _steps.Add(new GivenStreamStep(
-            id,
-            events,
-            (session, streamId, e) => session.Events.StartStream<TAggregate>(streamId, e),
-            Failure.TypeName(typeof(TAggregate))));
-        return this;
+        return Given(StreamKey.For(id), () => events(id), typeof(TAggregate));
+    }
+
+    /// <inheritdoc/>
+    public IGivenStage GivenStream(string id, Func<string, object[]> events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        return Given(StreamKey.For(id), () => events(id), null);
+    }
+
+    /// <inheritdoc/>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "Implements IGivenStage.GivenStream<TAggregate>.")]
+    public IGivenStage GivenStream<TAggregate>(string id, Func<string, object[]> events)
+        where TAggregate : class
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        return Given(StreamKey.For(id), () => events(id), typeof(TAggregate));
+    }
+
+    /// <inheritdoc/>
+    public IGivenStage GivenStream<TId>(TId id, Func<TId, object[]> events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        return Given(StreamKey.ForTyped(id), () => events(id), null);
+    }
+
+    /// <inheritdoc/>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "Implements IGivenStage.GivenStream<TAggregate, TId>.")]
+    public IGivenStage GivenStream<TAggregate, TId>(TId id, Func<TId, object[]> events)
+        where TAggregate : class
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        return Given(StreamKey.ForTyped(id), () => events(id), typeof(TAggregate));
     }
 
     /// <inheritdoc/>
@@ -97,15 +123,39 @@ internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
 
     /// <inheritdoc/>
     public ICommandStage ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Whole, StreamCheck.Has, predicate));
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenStreamHasEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenStreamHasEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public ICommandStage ThenStreamHasNoEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Whole, StreamCheck.HasNo, predicate));
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenStreamHasNoEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenStreamHasNoEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public ICommandStage ThenStreamEventCount(Guid id, int expected) =>
-        Add(StreamAssertionStep.ForCount(id, StreamScope.Whole, expected));
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenStreamEventCount(string id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenStreamEventCount<TId>(TId id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.ForTyped(id), StreamScope.Whole, expected));
 
     /// <inheritdoc/>
     public ICommandStage ThenThrows<TException>(Func<TException, bool>? predicate = null)
@@ -114,15 +164,39 @@ internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
 
     /// <inheritdoc/>
     public ICommandStage ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Appended, StreamCheck.Has, predicate));
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenAppended<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.ForTyped(id), StreamScope.Appended, predicate));
 
     /// <inheritdoc/>
     public ICommandStage ThenNotAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Appended, StreamCheck.HasNo, predicate));
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenNotAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenNotAppended<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.ForTyped(id), StreamScope.Appended, predicate));
 
     /// <inheritdoc/>
     public ICommandStage ThenAppendedCount(Guid id, int expected) =>
-        Add(StreamAssertionStep.ForCount(id, StreamScope.Appended, expected));
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Appended, expected));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenAppendedCount(string id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Appended, expected));
+
+    /// <inheritdoc/>
+    public ICommandStage ThenAppendedCount<TId>(TId id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.ForTyped(id), StreamScope.Appended, expected));
 
     /// <inheritdoc/>
     public ICommandStage ThenPublished<TMessage>(Func<TMessage, bool>? predicate = null) =>
@@ -142,6 +216,12 @@ internal sealed class ScenarioBuilder : IScenarioStart, ICommandStage
     /// </summary>
     /// <param name="step">The step.</param>
     internal void AddStep(IScenarioStep step) => _steps.Add(step);
+
+    private ScenarioBuilder Given(StreamKey key, Func<object[]> events, Type? aggregateType)
+    {
+        _steps.Add(new GivenStreamStep(key, events, aggregateType));
+        return this;
+    }
 
     private ScenarioBuilder Add(IScenarioStep step)
     {

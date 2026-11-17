@@ -56,7 +56,7 @@ public sealed class InternalGuardTests(NoDaemonHostFixture fixture)
             ActionExceptionClaimed = true,
             QueryResult = "old result",
         };
-        context.Snapshots[Guid.NewGuid()] = 3;
+        context.Snapshots[StreamKey.For(Guid.NewGuid())] = 3;
 
         context.BeginAction("step 4 When(RenameWidget)");
 
@@ -80,7 +80,7 @@ public sealed class InternalGuardTests(NoDaemonHostFixture fixture)
         [
             command,
             new WhenQueryStep<TestDomain.WidgetSummary?>(() => new TestDomain.FindWidget(id)),
-            StreamAssertionStep.ForCount(id, StreamScope.Appended, 0),
+            StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Appended, 0),
         ];
 
         await Assert.ThrowsAsync<HarnessAssertionException>(
@@ -97,7 +97,7 @@ public sealed class InternalGuardTests(NoDaemonHostFixture fixture)
         {
             CurrentStepLabel = "step 2 ThenAppendedCount",
         };
-        var step = StreamAssertionStep.ForCount(Guid.NewGuid(), StreamScope.Appended, 0);
+        var step = StreamAssertionStep.ForCount(StreamKey.For(Guid.NewGuid()), StreamScope.Appended, 0);
 
         var failure = await Assert.ThrowsAsync<HarnessAssertionException>(() => step.ExecuteAsync(context, Ct));
 

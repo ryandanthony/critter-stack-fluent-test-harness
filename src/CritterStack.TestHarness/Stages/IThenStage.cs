@@ -27,6 +27,27 @@ public interface IThenStage<out TSelf> : IScenario
     TSelf ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
 
     /// <summary>
+    /// Asserts that the whole string-keyed stream contains at least one <typeparamref name="TEvent"/> matching
+    /// <paramref name="predicate"/>.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <param name="id">The stream key.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type matches.</param>
+    /// <returns>The same stage.</returns>
+    TSelf ThenStreamHasEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
+    /// Asserts that the whole stream named by a strongly typed id contains at least one <typeparamref name="TEvent"/>
+    /// matching <paramref name="predicate"/>. See <see cref="IGivenStage.GivenStream{TId}(TId, Func{TId, object[]})"/> for how the id is unwrapped.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <typeparam name="TId">The id type: a single public, gettable property wrapping a Guid or a string.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type matches.</param>
+    /// <returns>The same stage.</returns>
+    TSelf ThenStreamHasEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
     /// Asserts that the whole stream contains no <typeparamref name="TEvent"/> matching <paramref name="predicate"/>.
     /// </summary>
     /// <typeparam name="TEvent">The event type.</typeparam>
@@ -36,12 +57,50 @@ public interface IThenStage<out TSelf> : IScenario
     TSelf ThenStreamHasNoEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
 
     /// <summary>
+    /// Asserts that the whole string-keyed stream contains no <typeparamref name="TEvent"/> matching
+    /// <paramref name="predicate"/>.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <param name="id">The stream key.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type counts.</param>
+    /// <returns>The same stage.</returns>
+    TSelf ThenStreamHasNoEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
+    /// Asserts that the whole stream named by a strongly typed id contains no <typeparamref name="TEvent"/> matching
+    /// <paramref name="predicate"/>.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <typeparam name="TId">The id type: a single public, gettable property wrapping a Guid or a string.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type counts.</param>
+    /// <returns>The same stage.</returns>
+    TSelf ThenStreamHasNoEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
     /// Asserts that the whole stream has exactly <paramref name="expected"/> events.
     /// </summary>
     /// <param name="id">The stream id.</param>
     /// <param name="expected">The expected event count. Zero matches a stream that doesn't exist.</param>
     /// <returns>The same stage.</returns>
     TSelf ThenStreamEventCount(Guid id, int expected);
+
+    /// <summary>
+    /// Asserts that the whole string-keyed stream has exactly <paramref name="expected"/> events.
+    /// </summary>
+    /// <param name="id">The stream key.</param>
+    /// <param name="expected">The expected event count. Zero matches a stream that doesn't exist.</param>
+    /// <returns>The same stage.</returns>
+    TSelf ThenStreamEventCount(string id, int expected);
+
+    /// <summary>
+    /// Asserts that the whole stream named by a strongly typed id has exactly <paramref name="expected"/> events.
+    /// </summary>
+    /// <typeparam name="TId">The id type, inferred from <paramref name="id"/>.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="expected">The expected event count. Zero matches a stream that doesn't exist.</param>
+    /// <returns>The same stage.</returns>
+    TSelf ThenStreamEventCount<TId>(TId id, int expected);
 
     /// <summary>
     /// Claims the exception thrown by the handler of the most recent <c>When</c> or <c>WhenQuery</c>. Put it first

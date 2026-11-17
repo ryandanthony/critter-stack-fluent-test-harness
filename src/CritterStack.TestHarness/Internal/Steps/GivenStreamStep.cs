@@ -4,41 +4,38 @@
 // </copyright>
 // -----------------------------------------------------------------------
 
-using Marten;
-
 namespace CritterStack.TestHarness.Internal.Steps;
 
 /// <summary>
 /// Writes events to a stream: starts it on the scenario's first Given for the id, appends after that.
 /// </summary>
-internal sealed class GivenStreamStep : IScenarioStep
+internal sealed class GivenStreamStep : IStreamStep
 {
-    private readonly Guid _id;
-    private readonly Func<Guid, object[]> _events;
-    private readonly Action<IDocumentSession, Guid, object[]> _start;
-    private readonly string _aggregateName;
+    private readonly Func<object[]> _events;
+    private readonly Type? _aggregateType;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GivenStreamStep"/> class.
     /// </summary>
     /// <param name="id">The stream id.</param>
-    /// <param name="events">Builds the events.</param>
-    /// <param name="start">Starts the stream, with or without an aggregate type.</param>
-    /// <param name="aggregateName">The aggregate type name for descriptions, or empty.</param>
-    internal GivenStreamStep(Guid id, Func<Guid, object[]> events, Action<IDocumentSession, Guid, object[]> start, string aggregateName)
+    /// <param name="events">Builds the events, from the id in the form the test passed it.</param>
+    /// <param name="aggregateType">The aggregate type to start the stream as, or null.</param>
+    internal GivenStreamStep(StreamKey id, Func<object[]> events, Type? aggregateType)
     {
-        _id = id;
+        StreamId = id;
         _events = events;
-        _start = start;
-        _aggregateName = aggregateName;
+        _aggregateType = aggregateType;
     }
+
+    /// <inheritdoc/>
+    public StreamKey StreamId { get; }
 
     /// <inheritdoc/>
     public StepKind Kind => StepKind.Given;
 
     /// <inheritdoc/>
     public string Describe() =>
-        _aggregateName.Length == 0 ? $"GivenStream({_id})" : $"GivenStream<{_aggregateName}>({_id})";
+        _aggregateType is null ? $"GivenStream({StreamId})" : $"GivenStream<{Failure.TypeName(_aggregateType)}>({StreamId})";
 
     /// <inheritdoc/>
     public async Task ExecuteAsync(ScenarioContext context, CancellationToken cancellationToken)
@@ -46,7 +43,7 @@ internal sealed class GivenStreamStep : IScenarioStep
         object[] events;
         try
         {
-            events = _events(_id);
+            events = _events();
         }
         catch (Exception ex)
         {
@@ -56,13 +53,13 @@ internal sealed class GivenStreamStep : IScenarioStep
         try
         {
             await using var session = context.OpenSession();
-            if (context.StartedStreams.Contains(_id))
+            if (context.StartedStreams.Contains(StreamId))
             {
-                session.Events.Append(_id, events);
+                StreamId.Append(session, events);
             }
             else
             {
-                _start(session, _id, events);
+                StreamId.StartStream(session, _aggregateType, events);
             }
 
             await session.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -79,7 +76,7 @@ internal sealed class GivenStreamStep : IScenarioStep
                 ex);
         }
 
-        context.StartedStreams.Add(_id);
+        context.StartedStreams.Add(StreamId);
         context.ProjectionsDirty = true;
     }
 }

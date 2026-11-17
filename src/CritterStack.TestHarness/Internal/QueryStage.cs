@@ -36,15 +36,39 @@ internal sealed class QueryStage<TResponse> : IQueryStage<TResponse>
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Whole, StreamCheck.Has, predicate));
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IQueryStage<TResponse> ThenStreamHasEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IQueryStage<TResponse> ThenStreamHasEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamHasNoEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Whole, StreamCheck.HasNo, predicate));
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IQueryStage<TResponse> ThenStreamHasNoEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IQueryStage<TResponse> ThenStreamHasNoEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenStreamEventCount(Guid id, int expected) =>
-        Add(StreamAssertionStep.ForCount(id, StreamScope.Whole, expected));
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+
+    /// <inheritdoc/>
+    public IQueryStage<TResponse> ThenStreamEventCount(string id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+
+    /// <inheritdoc/>
+    public IQueryStage<TResponse> ThenStreamEventCount<TId>(TId id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.ForTyped(id), StreamScope.Whole, expected));
 
     /// <inheritdoc/>
     public IQueryStage<TResponse> ThenThrows<TException>(Func<TException, bool>? predicate = null)
