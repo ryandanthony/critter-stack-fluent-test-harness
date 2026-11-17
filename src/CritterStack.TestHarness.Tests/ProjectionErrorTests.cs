@@ -60,10 +60,11 @@ public sealed class ProjectionErrorTests(PoisonDaemonHostFixture fixture)
             .WhenQuery<WidgetSummary?>(() => new FindWidget(id))
             .ThenResult(_ => true));
 
-        Assert.StartsWith(
-            "step 2 WhenQuery<WidgetSummary>(FindWidget): projection sync (CatchUp) of IFaultyDaemonStore failed with AggregateException [ApplyEventException]",
-            failure.Message,
-            StringComparison.Ordinal);
+        Assert.True(
+            failure.Message.StartsWith(
+                "step 2 WhenQuery<WidgetSummary>(FindWidget): projection sync (CatchUp) of IFaultyDaemonStore failed with AggregateException [ApplyEventException]",
+                StringComparison.Ordinal),
+            failure.ToString());
         var reported = Assert.IsType<AggregateException>(failure.InnerException);
         Assert.IsType<ApplyEventException>(Assert.Single(reported.Flatten().InnerExceptions));
     }
