@@ -16,5 +16,5 @@ internal interface ISnapshottingStep : IActionStep
     /// Gets the stream ids to snapshot before running, filled in by the runner from the assertions that follow.
     /// </summary>
     /// <value>The stream ids.</value>
-    HashSet<StreamKey> SnapshotIds { get; }
+    HashSet<StreamAddress> SnapshotIds { get; }
 }

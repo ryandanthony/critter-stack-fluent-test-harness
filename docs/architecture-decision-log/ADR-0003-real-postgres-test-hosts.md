@@ -1,6 +1,6 @@
 # ADR-0003: Test against real Postgres with Testcontainers and per-host schemas
 
-- **Status:** accepted (extended by [ADR-0019](./ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md): a fourth host with string stream ids)
+- **Status:** accepted (extended by [ADR-0019](./ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md): a fourth host with string stream ids; and by [ADR-0020](./ADR-0020-ancillary-stores-per-step-and-synced-together.md): ancillary stores on existing hosts, each in its own schema)
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Tests: fixtures), commits `b84d1af`, `01a7e35`

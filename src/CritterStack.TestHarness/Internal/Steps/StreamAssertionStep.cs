@@ -19,9 +19,9 @@ internal sealed class StreamAssertionStep : IStreamStep
     private readonly bool _hasPredicate;
     private readonly int _expectedCount;
 
-    private StreamAssertionStep(StreamKey streamId, StreamScope scope, StreamCheck check, Type? eventType, Func<object, bool>? matches, bool hasPredicate, int expectedCount)
+    private StreamAssertionStep(StreamAddress stream, StreamScope scope, StreamCheck check, Type? eventType, Func<object, bool>? matches, bool hasPredicate, int expectedCount)
     {
-        StreamId = streamId;
+        Stream = stream;
         Scope = scope;
         _check = check;
         _eventType = eventType;
@@ -31,7 +31,7 @@ internal sealed class StreamAssertionStep : IStreamStep
     }
 
     /// <inheritdoc/>
-    public StreamKey StreamId { get; }
+    public StreamAddress Stream { get; }
 
     /// <summary>Gets which events the assertion looks at.</summary>
     /// <value>The scope.</value>
@@ -49,7 +49,7 @@ internal sealed class StreamAssertionStep : IStreamStep
     /// <param name="check"><see cref="StreamCheck.Has"/> or <see cref="StreamCheck.HasNo"/>.</param>
     /// <param name="predicate">Optional filter.</param>
     /// <returns>The step.</returns>
-    internal static StreamAssertionStep ForEvent<TEvent>(StreamKey id, StreamScope scope, StreamCheck check, Func<TEvent, bool>? predicate) =>
+    internal static StreamAssertionStep ForEvent<TEvent>(StreamAddress id, StreamScope scope, StreamCheck check, Func<TEvent, bool>? predicate) =>
         new(id, scope, check, typeof(TEvent), data => data is TEvent e && (predicate is null || predicate(e)), predicate is not null, 0);
 
     /// <summary>
@@ -60,7 +60,7 @@ internal sealed class StreamAssertionStep : IStreamStep
     /// <param name="scope">Which events to look at.</param>
     /// <param name="predicate">Optional filter.</param>
     /// <returns>The step.</returns>
-    internal static StreamAssertionStep Has<TEvent>(StreamKey id, StreamScope scope, Func<TEvent, bool>? predicate) =>
+    internal static StreamAssertionStep Has<TEvent>(StreamAddress id, StreamScope scope, Func<TEvent, bool>? predicate) =>
         ForEvent(id, scope, StreamCheck.Has, predicate);
 
     /// <summary>
@@ -71,7 +71,7 @@ internal sealed class StreamAssertionStep : IStreamStep
     /// <param name="scope">Which events to look at.</param>
     /// <param name="predicate">Optional filter.</param>
     /// <returns>The step.</returns>
-    internal static StreamAssertionStep HasNo<TEvent>(StreamKey id, StreamScope scope, Func<TEvent, bool>? predicate) =>
+    internal static StreamAssertionStep HasNo<TEvent>(StreamAddress id, StreamScope scope, Func<TEvent, bool>? predicate) =>
         ForEvent(id, scope, StreamCheck.HasNo, predicate);
 
     /// <summary>
@@ -81,7 +81,7 @@ internal sealed class StreamAssertionStep : IStreamStep
     /// <param name="scope">Which events to look at.</param>
     /// <param name="expected">The expected count.</param>
     /// <returns>The step.</returns>
-    internal static StreamAssertionStep ForCount(StreamKey id, StreamScope scope, int expected) =>
+    internal static StreamAssertionStep ForCount(StreamAddress id, StreamScope scope, int expected) =>
         new(id, scope, StreamCheck.Count, null, null, false, expected);
 
     /// <inheritdoc/>
@@ -97,9 +97,9 @@ internal sealed class StreamAssertionStep : IStreamStep
             _ => "ThenAppendedCount",
         };
 
-        return _eventType is null
-            ? $"{name}({StreamId}, {_expectedCount})"
-            : $"{name}<{Failure.TypeName(_eventType)}>({StreamId})";
+        return (_eventType is null
+            ? $"{name}({Stream.Key}, {_expectedCount})"
+            : $"{name}<{Failure.TypeName(_eventType)}>({Stream.Key})") + Stream.StoreSuffix;
     }
 
     /// <inheritdoc/>
@@ -126,18 +126,18 @@ internal sealed class StreamAssertionStep : IStreamStep
 
     private async Task<IReadOnlyList<IEvent>> LoadAsync(ScenarioContext context, CancellationToken cancellationToken)
     {
-        await using var session = context.OpenQuerySession();
+        await using var session = context.OpenQuerySession(Stream.Store);
         if (Scope == StreamScope.Whole)
         {
-            return await StreamId.FetchAsync(session, 0, cancellationToken).ConfigureAwait(false);
+            return await Stream.Key.FetchAsync(session, 0, cancellationToken).ConfigureAwait(false);
         }
 
-        if (!context.Snapshots.TryGetValue(StreamId, out var snapshot))
+        if (!context.Snapshots.TryGetValue(Stream, out var snapshot))
         {
             throw Failure.Create(context.CurrentStepLabel, "no stream snapshot was taken before the When; this is a harness bug");
         }
 
-        return await StreamId.FetchAsync(session, snapshot + 1, cancellationToken).ConfigureAwait(false);
+        return await Stream.Key.FetchAsync(session, snapshot + 1, cancellationToken).ConfigureAwait(false);
     }
 
     private bool AnyMatch(ScenarioContext context, IReadOnlyList<IEvent> events) =>
@@ -149,8 +149,8 @@ internal sealed class StreamAssertionStep : IStreamStep
         return _hasPredicate ? $"{type} matching the predicate" : type;
     }
 
-    private static HarnessAssertionException Fail(ScenarioContext context, string message, IReadOnlyList<IEvent> events) =>
+    private HarnessAssertionException Fail(ScenarioContext context, string message, IReadOnlyList<IEvent> events) =>
         Failure.Create(
             context.CurrentStepLabel,
-            $"{message}.{Environment.NewLine}Actual events:{Environment.NewLine}{PayloadFormatter.FormatEvents(context, events)}");
+            $"{message}.{Environment.NewLine}Actual events:{Environment.NewLine}{PayloadFormatter.FormatEvents(context, Stream.Store, events)}");
 }

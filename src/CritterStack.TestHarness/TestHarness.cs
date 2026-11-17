@@ -23,6 +23,9 @@ public static class TestHarness
     /// <param name="host">A running host with Marten and Wolverine registered.</param>
     /// <param name="configure">Optional callback that sets <see cref="HarnessOptions"/>.</param>
     /// <returns>The start stage, where <c>ForTenant</c> or the first Given can be called.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="host"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">A store added with <see cref="HarnessOptions.UseStore{TStore}"/> isn't
+    /// registered in the host.</exception>
     /// <example>
     /// <code>
     /// await TestHarness
@@ -38,6 +41,10 @@ public static class TestHarness
 
         var options = new HarnessOptions();
         configure?.Invoke(options);
+        foreach (var store in options.ExtraStores)
+        {
+            _ = store.Resolve(host.Services);
+        }
 
         return new Internal.ScenarioBuilder(host, options);
     }

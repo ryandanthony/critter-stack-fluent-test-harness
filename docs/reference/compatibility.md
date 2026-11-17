@@ -22,11 +22,10 @@ The harness library references Alba, Marten and WolverineFx only. A host running
 
 | Not supported | What it would need |
 |---|---|
-| Ancillary document stores (`IDocumentStore` subtypes) | A generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the Marten host extensions. |
 | More than one tenant per scenario | Run one scenario per tenant. |
 | Strongly typed ids that wrap anything but a `Guid` or `string` | Nothing: Marten's stream identity is one or the other. |
 
-The harness always uses the host's main `IDocumentStore`. Stream ids can be a `Guid`, a `string` or a strongly typed id that wraps either, matching the store's `Events.StreamIdentity` ([PDR-0013](../product-decision-log/PDR-0013-string-and-strongly-typed-stream-ids.md)).
+Scenarios use the host's main `IDocumentStore` and any ancillary store registered with `AddMartenStore<TStore>()`, chosen with `InStore<TStore>()` ([PDR-0014](../product-decision-log/PDR-0014-ancillary-document-stores.md)). Stream ids can be a `Guid`, a `string` or a strongly typed id that wraps either, matching the store's `Events.StreamIdentity` ([PDR-0013](../product-decision-log/PDR-0013-string-and-strongly-typed-stream-ids.md)).
 
 ## Behaviour that depends on the Critter Stack version
 

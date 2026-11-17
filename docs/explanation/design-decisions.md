@@ -30,9 +30,16 @@ Stream methods take whatever id the service uses: a `Guid`, a `string` for a sto
 
 An id of the wrong kind fails before the scenario runs. Marten catches most of these itself, but not all: reading a stream's version with a string on a Guid store just returns nothing, so an appended-event assertion could quietly read the wrong events.
 
+## Ancillary stores
+
+v1 used only the main store. Services that split their data across `AddMartenStore<TStore>()` stores couldn't test those streams, and their async read models were never synced, because Marten's sync helpers for the main store don't touch ancillary stores. Now `InStore<TStore>()` picks the store for the stream steps that follow, and projection sync runs once per store in the scenario.
+
+`InStore` is a step in the chain rather than an argument on every stream method. A flow that crosses stores reads in order, top to bottom, and the stream methods keep the signatures they had. The store stays chosen across `When` because the Thens after a command usually check the store the Givens wrote to.
+
+Only the stores a scenario uses are synced. Syncing every registered store would make each action slower on hosts with several stores, and would let an unrelated store's projection error fail the scenario. `UseStore<TStore>()` covers the store a scenario touches only through handlers and queries.
+
 ## What v1 leaves out
 
-- **Ancillary document stores.** Projection sync would need to know the store's type to call the right Marten overloads. A `UseStore<TStore>()` option could add this later.
 - **Several tenants in one scenario.** See above.
 
 See [compatibility](../reference/compatibility.md) for the exact limits.

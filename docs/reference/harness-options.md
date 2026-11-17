@@ -18,10 +18,16 @@ TestHarness.Setup(host, o =>
 | `IncludeExternalMessages` | `bool` | `false` | Adds `IncludeExternalTransports()` to Wolverine tracking, so cascaded messages sent to real brokers are waited for. |
 | `HttpTenant` | `Action<Alba.Scenario, string>?` | `null` | How a `WhenHttp` request carries the scenario's tenant under `ForTenant`, for example `(x, tenant) => x.WithRequestHeader("tenant", tenant)`. Applied after the test's own request configuration. Required for `WhenHttp` in a `ForTenant` scenario. |
 
+## `UseStore<TStore>()`
+
+- **Returns:** the same `HarnessOptions`, so calls chain: `o => o.UseStore<IOrderStore>().UseStore<IBillingStore>()`.
+- **Does:** adds an ancillary Marten store (`AddMartenStore<TStore>()`) to the stores projection sync brings up to date before each action. Use it for a store the scenario never names with `InStore`, such as one that only a `[MartenStore]` handler writes and only a query reads. The main store and every store named by `InStore` are always synced, so `UseStore` is never needed for them. `UseStore<IDocumentStore>()` and repeated calls are harmless.
+- **Fails:** `TestHarness.Setup` throws `InvalidOperationException` if `TStore` isn't registered in the host, naming the type and `AddMartenStore<TStore>()`.
+
 ## `ProjectionSync` values
 
-| Value | Calls | Valid on |
+| Value | Calls, for each store the scenario syncs | Valid on |
 |---|---|---|
-| `CatchUp` | With a daemon (`IProjectionCoordinator` registered): `host.ForceAllMartenDaemonActivityToCatchUpAsync`. Without one: `store.BuildProjectionDaemonAsync()` then `CatchUpAsync(ProjectionTimeout)`. | Any host. |
-| `WaitForNonStale` | `host.WaitForNonStaleProjectionDataAsync(ProjectionTimeout)`. | Hosts that run `AddAsyncDaemon`. Without a daemon it always times out. |
+| `CatchUp` | With that store's daemon running (`IProjectionCoordinator`, or `IProjectionCoordinator<TStore>` for an ancillary store): `host.ForceAllMartenDaemonActivityToCatchUpAsync` (or its `<TStore>` form). Without one: `store.BuildProjectionDaemonAsync()` then `CatchUpAsync(ProjectionTimeout)`. | Any host. |
+| `WaitForNonStale` | `host.WaitForNonStaleProjectionDataAsync(ProjectionTimeout)` (or its `<TStore>` form). | Hosts that run `AddAsyncDaemon` for every synced store. Without a daemon it always times out. |
 | `None` | Nothing. | Hosts whose projections are all inline. |

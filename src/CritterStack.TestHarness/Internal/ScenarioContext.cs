@@ -16,18 +16,24 @@ namespace CritterStack.TestHarness.Internal;
 /// </summary>
 internal sealed class ScenarioContext
 {
+    private readonly Dictionary<StoreRef, IDocumentStore> _stores = [];
+
     /// <summary>
     /// Initializes a new instance of the <see cref="ScenarioContext"/> class.
     /// </summary>
     /// <param name="host">The host under test.</param>
     /// <param name="options">The harness options.</param>
     /// <param name="tenantId">The scenario's tenant, or null for the default tenant.</param>
-    internal ScenarioContext(IHost host, HarnessOptions options, string? tenantId)
+    /// <param name="syncStores">The ancillary stores to sync besides the main store, in order. Null or empty for the
+    /// main store only.</param>
+    internal ScenarioContext(IHost host, HarnessOptions options, string? tenantId, IReadOnlyList<StoreRef>? syncStores = null)
     {
         Host = host;
         Options = options;
         TenantId = tenantId;
         Store = host.Services.GetRequiredService<IDocumentStore>();
+        _stores[StoreRef.Main] = Store;
+        SyncStores = [StoreRef.Main, .. (syncStores ?? []).Where(s => !s.IsMain).Distinct()];
     }
 
     /// <summary>Gets the host under test.</summary>
@@ -43,20 +49,25 @@ internal sealed class ScenarioContext
     internal string? TenantId { get; }
 
     /// <summary>Gets the host's main document store.</summary>
-    /// <value>The store.</value>
+    /// <value>The main store. Used for payloads that don't belong to a stream, such as query results.</value>
     internal IDocumentStore Store { get; }
 
-    /// <summary>Gets the stream ids this scenario's Givens have already started.</summary>
-    /// <value>The started stream ids.</value>
-    internal HashSet<StreamKey> StartedStreams { get; } = [];
+    /// <summary>Gets the stream ids this scenario's Givens have already started, per store.</summary>
+    /// <value>The started streams.</value>
+    internal HashSet<StreamAddress> StartedStreams { get; } = [];
 
-    /// <summary>Gets or sets the watcher that records daemon shards pausing with an error during this scenario.</summary>
-    /// <value>The watcher, or null when the host runs no daemon or the sync mode isn't <c>CatchUp</c>.</value>
-    internal ShardFailureWatcher? ShardFailures { get; set; }
+    /// <summary>Gets the stores projection sync brings up to date, main store first.</summary>
+    /// <value>The sync set.</value>
+    internal IReadOnlyList<StoreRef> SyncStores { get; }
+
+    /// <summary>Gets the watchers that record daemon shards pausing with an error during this scenario, one per
+    /// synced store whose daemon runs in the host.</summary>
+    /// <value>Store to watcher; empty when no store has a daemon or the sync mode isn't <c>CatchUp</c>.</value>
+    internal Dictionary<StoreRef, ShardFailureWatcher> ShardFailures { get; } = [];
 
     /// <summary>Gets each snapshotted stream's version, taken just before the most recent <c>When</c>.</summary>
-    /// <value>Stream id to version.</value>
-    internal Dictionary<StreamKey, long> Snapshots { get; } = [];
+    /// <value>Stream to version.</value>
+    internal Dictionary<StreamAddress, long> Snapshots { get; } = [];
 
     /// <summary>Gets or sets a value indicating whether anything was written since the last projection sync.</summary>
     /// <value>True when a sync is needed.</value>
@@ -137,16 +148,40 @@ internal sealed class ScenarioContext
     internal void RelabelAction() => ActionLabel = CurrentStepLabel;
 
     /// <summary>
-    /// Opens a writable session for the scenario's tenant.
+    /// Opens a writable session on <paramref name="store"/> for the scenario's tenant.
     /// </summary>
+    /// <param name="store">The store.</param>
     /// <returns>The session.</returns>
-    internal IDocumentSession OpenSession() =>
-        TenantId is null ? Store.LightweightSession() : Store.LightweightSession(TenantId);
+    internal IDocumentSession OpenSession(StoreRef store)
+    {
+        var documentStore = StoreFor(store);
+        return TenantId is null ? documentStore.LightweightSession() : documentStore.LightweightSession(TenantId);
+    }
 
     /// <summary>
-    /// Opens a read-only session for the scenario's tenant.
+    /// Opens a read-only session on <paramref name="store"/> for the scenario's tenant.
     /// </summary>
+    /// <param name="store">The store.</param>
     /// <returns>The session.</returns>
-    internal IQuerySession OpenQuerySession() =>
-        TenantId is null ? Store.QuerySession() : Store.QuerySession(TenantId);
+    internal IQuerySession OpenQuerySession(StoreRef store)
+    {
+        var documentStore = StoreFor(store);
+        return TenantId is null ? documentStore.QuerySession() : documentStore.QuerySession(TenantId);
+    }
+
+    /// <summary>
+    /// Resolves a store from the host, once per scenario.
+    /// </summary>
+    /// <param name="store">The store.</param>
+    /// <returns>The document store.</returns>
+    internal IDocumentStore StoreFor(StoreRef store)
+    {
+        if (!_stores.TryGetValue(store, out var documentStore))
+        {
+            documentStore = store.Resolve(Host.Services);
+            _stores[store] = documentStore;
+        }
+
+        return documentStore;
+    }
 }

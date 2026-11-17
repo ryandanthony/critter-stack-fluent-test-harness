@@ -12,6 +12,8 @@ Every public type and method in `CritterStack.TestHarness`, in the order a scena
 | `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `When(command)` | `ICommandStage` |
 | `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `WhenQuery<TResponse>(query)` | `IQueryStage<TResponse>` |
 | `IScenarioStart`, `IGivenStage`, `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `WhenHttp(request)` | `IHttpStage` |
+| `IScenarioStart`, `IGivenStage` | `InStore<TStore>()` | `IGivenStage` |
+| `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `InStore<TStore>()` | same stage |
 | `ICommandStage`, `IQueryStage<T>`, `IHttpStage` | `ThenStreamHasEvent`, `ThenStreamHasNoEvent`, `ThenStreamEventCount`, `ThenThrows` | same stage |
 | `ICommandStage`, `IHttpStage` | `ThenAppended`, `ThenNotAppended`, `ThenAppendedCount`, `ThenPublished` | same stage |
 | `IQueryStage<T>` | `ThenResult` | `IQueryStage<T>` |
@@ -42,13 +44,34 @@ Every method that names a stream (`GivenStream`, `ThenStream*`, `ThenAppended*`)
 
 The sections below list the `Guid` form. The `string` and typed forms behave the same.
 
+## Stores
+
+A scenario starts on the host's main `IDocumentStore`. Services that keep data in ancillary stores (`AddMartenStore<TStore>()`) switch with `InStore<TStore>()`:
+
+```csharp
+await TestHarness.Setup(host)
+    .GivenStream<Widget>(widgetId, ...)         // main store
+    .InStore<ILedgerStore>()
+    .GivenStream<Ledger>(ledgerId, ...)         // ledger store
+    .When(() => new PostEntry(ledgerId, 10m))   // Wolverine's [MartenStore] routing picks the handler's store
+    .ThenAppended<EntryPosted>(ledgerId)        // still the ledger store
+    .InStore<IDocumentStore>()
+    .ThenStreamEventCount(widgetId, 1);         // back to the main store
+```
+
+- `InStore` changes the store for the stream steps after it (`GivenStream`, `ThenStream*`, `ThenAppended*`) until the next `InStore`, across `When`, `WhenQuery` and `WhenHttp`. `InStore<IDocumentStore>()` is the main store. Commands, queries and requests are unaffected.
+- Projection sync covers the main store, every store named by `InStore`, and every store added with `HarnessOptions.UseStore<TStore>()`, in that order. Each store uses its own daemon if the host runs one, otherwise a temporary daemon from that store.
+- The same stream id in two stores is two streams. Sessions use the scenario's tenant in every store. Stream ids are checked against the step's store's `StreamIdentity`, and its events are shown with that store's serializer.
+- Labels of steps outside the main store end in ` in TStore`, for example `ThenAppended<EntryPosted>(3f0c…) in ILedgerStore`.
+- **Fails:** `InStore` throws `InvalidOperationException` at once if `TStore` isn't registered in the host, naming the type and `AddMartenStore<TStore>()`. A projection error in an ancillary store fails the next action with `projection sync (<mode>) of TStore failed with …`.
+
 ## `TestHarness`
 
 ### `Setup(IHost host, Action<HarnessOptions>? configure = null)`
 
 - **Returns:** `IScenarioStart`.
 - **Does:** starts recording a scenario against `host`. The harness never starts, stops or disposes the host. An `IAlbaHost` is an `IHost`.
-- **Fails:** `ArgumentNullException` if `host` is null.
+- **Fails:** `ArgumentNullException` if `host` is null; `InvalidOperationException` if a store added with `UseStore<TStore>()` isn't registered.
 
 ## `IScenarioStart`
 

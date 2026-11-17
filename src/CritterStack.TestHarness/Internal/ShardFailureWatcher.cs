@@ -8,7 +8,6 @@ using System.Collections.Concurrent;
 using JasperFx.Events.Projections;
 using Marten;
 using Marten.Storage;
-using Microsoft.Extensions.DependencyInjection;
 using ShardAction = JasperFx.Events.Daemon.ShardAction;
 
 namespace CritterStack.TestHarness.Internal;
@@ -38,16 +37,17 @@ internal sealed class ShardFailureWatcher : IObserver<ShardState>, IDisposable
     }
 
     /// <summary>
-    /// Starts watching if the host runs an async daemon and the scenario uses <see cref="ProjectionSync.CatchUp"/>.
+    /// Starts watching a store if the host runs its async daemon and the scenario uses <see cref="ProjectionSync.CatchUp"/>.
     /// </summary>
     /// <param name="host">The host under test.</param>
     /// <param name="options">The harness options.</param>
-    /// <param name="store">The host's main store.</param>
+    /// <param name="storeRef">Which store to watch.</param>
+    /// <param name="store">The resolved store.</param>
     /// <returns>The watcher, or null when there is nothing to watch.</returns>
-    internal static async Task<ShardFailureWatcher?> StartAsync(Microsoft.Extensions.Hosting.IHost host, HarnessOptions options, IDocumentStore store)
+    internal static async Task<ShardFailureWatcher?> StartAsync(Microsoft.Extensions.Hosting.IHost host, HarnessOptions options, StoreRef storeRef, IDocumentStore store)
     {
         if (options.ProjectionSync != ProjectionSync.CatchUp
-            || host.Services.GetService<Marten.Events.Daemon.Coordination.IProjectionCoordinator>() is null
+            || !storeRef.HasCoordinator(host.Services)
             || store is not DocumentStore documentStore)
         {
             return null;

@@ -73,11 +73,17 @@ flowchart LR
   - `ProjectionTimeout`
   - `TrackingTimeout`
   - `IncludeExternalMessages` (Wolverine tracking)
-- **Scope: main store; Guid, string and strongly typed stream ids.** The harness always uses the host's main `IDocumentStore`. Stream methods come in plain and `<TAggregate>` forms, each taking a `Guid`, a `string` (for `StreamIdentity.AsString`) or a strongly typed id `TId` that wraps either ([PDR-0013](../product-decision-log/PDR-0013-string-and-strongly-typed-stream-ids.md), [ADR-0019](../architecture-decision-log/ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md)):
+- **Scope: main and ancillary stores; Guid, string and strongly typed stream ids.** A scenario starts on the host's main `IDocumentStore`. Stream methods come in plain and `<TAggregate>` forms, each taking a `Guid`, a `string` (for `StreamIdentity.AsString`) or a strongly typed id `TId` that wraps either ([PDR-0013](../product-decision-log/PDR-0013-string-and-strongly-typed-stream-ids.md), [ADR-0019](../architecture-decision-log/ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md)):
   - every id becomes one internal `StreamKey` (a `Guid` or a `string` plus a display label) when the step is recorded, so the steps, snapshots and started-stream set have a single code path. Typed ids are unwrapped with JasperFx's `ValueTypeInfo`, Marten's own value type rules; the events factory still gets the id in the form the test passed;
   - before the first step, the runner checks every stream step's key against `Store.Options.Events.StreamIdentity` and fails on a mismatch. Marten doesn't catch every case (`FetchStreamStateAsync(string)` on a Guid store returns null), and its messages vary by call;
   - v1 took only `Guid` ids; string and typed ids were added after v1.
-- **Not supported: ancillary stores** (`IDocumentStore` subtypes): would need a generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the host sync methods.
+- **Ancillary stores** (`AddMartenStore<TStore>()`, [PDR-0014](../product-decision-log/PDR-0014-ancillary-document-stores.md), [ADR-0020](../architecture-decision-log/ADR-0020-ancillary-stores-per-step-and-synced-together.md)):
+  - `InStore<TStore>()` on `IGivenStage` and `IThenStage<TSelf>` moves an internal `StoreCursor`. Every stream step records a `StreamAddress` (a `StoreRef` plus the `StreamKey`) when it is added, so the choice holds across `When` until the next `InStore`. `InStore<IDocumentStore>()` is the main store. Commands, queries and requests are unaffected: handlers pick their store with `[MartenStore]` or by injecting it.
+  - `StoreRef` resolves the store from the host's services and knows whether the host runs a coordinator for it (`IProjectionCoordinator` or `IProjectionCoordinator<TStore>`). An unregistered type throws `InvalidOperationException` at the `InStore` line, or at `Setup` for `HarnessOptions.UseStore<TStore>()`.
+  - snapshots, the started-stream set and the id-kind check are keyed by `StreamAddress`, so the same id in two stores is two streams. `ScenarioContext` opens one session per store, and payloads are serialized with that store's serializer.
+  - projection sync runs per store: the main store, stores named by `InStore`, then `UseStore` stores. `CatchUp` uses `ForceAllMartenDaemonActivityToCatchUpAsync<TStore>` with a coordinator, else a temporary daemon from that store. `WaitForNonStale` skips a store with no events (`EventCount == 0`), because Marten's wait loop times out on an empty event store. A failure names the store: `projection sync (<mode>) of TStore failed …`.
+  - one `ShardFailureWatcher` per store in the scenario, so an ancillary daemon's apply error fails the next action.
+  - main-store sync doesn't catch up ancillary stores (verified on 9.44 / 6.44 and 9.62 / 6.64.2), which is why the scenario must name or `UseStore` them.
 - **Multi-tenancy:** one tenant per scenario. `Setup` returns `IScenarioStart`, which adds `ForTenant(tenantId)` on top of `IGivenStage`. `ForTenant` returns a plain `IGivenStage`, so it can only be called once, straight after `Setup` and before any Given. If it isn't called, the scenario uses Marten's default tenant. When a tenant is set, every step uses it:
   - Givens and all Then reads open sessions with `store.LightweightSession(tenantId)`;
   - `When` runs `host.TrackActivity().Timeout(TrackingTimeout)[.IncludeExternalTransports()].ExecuteAndWaitAsync(c => c.InvokeForTenantAsync(tenantId, command))`;
@@ -347,7 +353,8 @@ Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
 - `ScenarioBuilder.cs`: implements `IScenarioStart`, `IGivenStage` and `ICommandStage`, records the steps and holds the scenario's tenant id. Exposes the last run's `ScenarioContext` to the test project (through `InternalsVisibleTo`) for the sync-count test.
 - `QueryStage.cs`: `QueryStage<TResponse>`, created per `WhenQuery` call. It implements `IQueryStage<TResponse>` and forwards to the owning `ScenarioBuilder`.
 - `ScenarioRunner.cs`: plans stream snapshots, runs the steps in order and enforces the unclaimed-exception rule.
-- `ScenarioContext.cs`: host, store, tenant, tracked session, captured exception, last query result, stream-version snapshots, the started-stream set, the projection-sync dirty flag and sync count.
+- `ScenarioContext.cs`: host, stores (one session per store), tenant, tracked session, captured exception, last query result, stream-version snapshots, the started-stream set, shard failures per store, the projection-sync dirty flag and sync count.
+- `StoreRef.cs`, `StreamAddress.cs`, `StoreCursor.cs`: the main or a typed ancillary store, a stream's (store, key) address, and the builder's current store.
 - `IScenarioStep.cs` and `StepKind.cs`: the step contract.
 - `ProjectionSyncRunner.cs`: the dirty-flag check and the three sync modes, including the two `CatchUp` paths.
 - `ExceptionClassifier.cs`: handler vs infrastructure classification, `ThenThrows` matching and `AggregateException` unwrapping.
@@ -356,7 +363,7 @@ Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
 
 ## Tests
 
-> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md), [ADR-0019](../architecture-decision-log/ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md). The list below is the v1 baseline; the suite has grown since (159 tests at 2026-11-16 after WhenHttp, 185 after string and typed stream ids, see the [implementation plan](../implementation-plan/00-overview.md)). Since P06 there is a fourth host, `StringIdHostFixture` (schema `harness_stringids`, `StreamIdentity.AsString`, the string-keyed `Gadget` domain), and the no-daemon host also runs the `Parcel` domain, whose aggregate, events, `[AggregateHandler]` and async read model use the typed id `ParcelId(Guid Value)`.
+> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md), [ADR-0019](../architecture-decision-log/ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md). The list below is the v1 baseline; the suite has grown since (159 tests at 2026-11-16 after WhenHttp, 185 after string and typed stream ids, 204 after ancillary stores, see the [implementation plan](../implementation-plan/00-overview.md)). Since P06 there is a fourth host, `StringIdHostFixture` (schema `harness_stringids`, `StreamIdentity.AsString`, the string-keyed `Gadget` domain), and the no-daemon host also runs the `Parcel` domain, whose aggregate, events, `[AggregateHandler]` and async read model use the typed id `ParcelId(Guid Value)`. Since P07 the no-daemon host also registers a plain ancillary `ILedgerStore`, the daemon host one integrated with Wolverine and with its own daemon, and the poison host an `IFaultyDaemonStore` whose projection always fails.
 
 The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, which travels with the harness. It has its own tiny test domain and host:
 
@@ -460,7 +467,7 @@ docs/
     api.md                         every stage and method, laid out to mirror the stage interfaces, with the valid-next-step table
     harness-options.md             every HarnessOptions field: type, default, effect
     failure-messages.md            every failure the harness raises: when, message shape, claimable or not
-    compatibility.md               supported .NET, Marten, Wolverine and Alba versions; limits (main store only)
+    compatibility.md               supported .NET, Marten, Wolverine and Alba versions; limits (one tenant per scenario)
   explanation/
     execution-model.md             deferred steps, the runner, why the chain is synchronous
     appended-vs-whole-stream.md    the two kinds of stream assertion and the version snapshot

@@ -23,6 +23,7 @@ The docs are split by what you need right now.
 - [Query read models](how-to/query-read-models.md)
 - [Test HTTP endpoints](how-to/test-http-endpoints.md)
 - [Use string and strongly typed stream ids](how-to/use-string-and-typed-stream-ids.md)
+- [Use an ancillary store](how-to/use-an-ancillary-store.md)
 - [Debug a failing scenario](how-to/debug-a-failing-scenario.md)
 
 ## Reference

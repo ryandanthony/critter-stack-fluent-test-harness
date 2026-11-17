@@ -93,6 +93,20 @@ public abstract class HarnessHostFixture : IAsyncLifetime
     /// <value>The suffix, such as <c>WidgetEndpoints</c>.</value>
     protected virtual string EndpointSuffix => nameof(WidgetEndpoints);
 
+    /// <summary>
+    /// Gets the shared container's connection string, for ancillary stores a host adds.
+    /// </summary>
+    /// <value>The connection string.</value>
+    protected string ConnectionString => _postgres.ConnectionString;
+
+    /// <summary>
+    /// Adds host-specific services after Marten and Wolverine, such as ancillary Marten stores.
+    /// </summary>
+    /// <param name="services">The host's services.</param>
+    protected virtual void ConfigureServices(IServiceCollection services)
+    {
+    }
+
     /// <inheritdoc/>
     public async ValueTask InitializeAsync()
     {
@@ -105,6 +119,7 @@ public abstract class HarnessHostFixture : IAsyncLifetime
 
         AddMarten(builder.Services);
         AddWolverine(builder);
+        ConfigureServices(builder.Services);
 
         // No ConfigureAwait: Alba 8 returns a Task, Alba 9 an awaitable AlbaHostBuilder, and this must build on both.
         _host = await AlbaHost.For(builder, MapEndpoints);

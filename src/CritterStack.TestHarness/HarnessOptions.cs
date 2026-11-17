@@ -45,4 +45,33 @@ public sealed class HarnessOptions
     /// <value>Called with the Alba request and the tenant id, after the test's own request configuration.
     /// Defaults to <see langword="null"/>. For example <c>(x, tenant) =&gt; x.WithRequestHeader("tenant", tenant)</c>.</value>
     public Action<Alba.Scenario, string>? HttpTenant { get; set; }
+
+    /// <summary>
+    /// Gets the ancillary stores to sync besides the main store and the stores the scenario names with
+    /// <c>InStore</c>.
+    /// </summary>
+    /// <value>In the order they were added, without duplicates.</value>
+    internal List<Internal.StoreRef> ExtraStores { get; } = [];
+
+    /// <summary>
+    /// Adds an ancillary Marten store (registered with <c>AddMartenStore&lt;TStore&gt;()</c>) to the stores whose async
+    /// projections are brought up to date before each action, for a store the scenario never names with
+    /// <c>InStore</c>: for example one only a <c>[MartenStore]</c> handler writes and only a query reads. Stores named by
+    /// <c>InStore</c> and the main store are always synced.
+    /// </summary>
+    /// <typeparam name="TStore">The store type. <see cref="Marten.IDocumentStore"/> (the main store) is accepted and has no
+    /// effect.</typeparam>
+    /// <returns>These options, for chaining.</returns>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The store is chosen by type; there is no value to infer it from.")]
+    public HarnessOptions UseStore<TStore>()
+        where TStore : class, Marten.IDocumentStore
+    {
+        var store = Internal.StoreRef.For<TStore>();
+        if (!store.IsMain && !ExtraStores.Contains(store))
+        {
+            ExtraStores.Add(store);
+        }
+
+        return this;
+    }
 }
