@@ -2,19 +2,21 @@
 
 ## Supported versions
 
-Built and tested against:
+The package depends on Alba, Marten and WolverineFx with a minimum version and **no upper bound**. Any newer release, minor or major, installs. Your service's own versions win.
 
-| Dependency | Version |
-|---|---|
-| .NET | `net10.0` |
-| Marten | 9.44.0 |
-| WolverineFx / WolverineFx.Marten | 6.44.0 |
-| Alba | 8.5.3 |
-| PostgreSQL (tests) | 17 |
+| Dependency | Minimum (floor) | Also tested on |
+|---|---|---|
+| .NET | `net10.0` | |
+| Marten | 9.44.0 | latest stable |
+| WolverineFx / WolverineFx.Marten | 6.44.0 | latest stable |
+| Alba | 8.5.3 | latest stable (9.x included) |
+| PostgreSQL (tests) | 17 | |
 
-The harness library references Alba, Marten and WolverineFx only. A host running WolverineFx 6.44 in the default `TypeLoadMode.Dynamic` also needs `WolverineFx.RuntimeCompilation`; that is the host's dependency, not the harness's.
+Every build runs the full suite and the packaged-consumer check on the minimums. A separate compatibility run repeats both against the newest stable Marten, WolverineFx and Alba on nuget.org, on every push to `main` and every Monday. When a new release breaks the harness, that run opens an issue labelled `compatibility` ([ADR-0018](../architecture-decision-log/ADR-0018-critter-stack-floor-and-latest.md)). Last verified on 2026-11-17 against Marten 9.62.0, WolverineFx 6.64.2 and Alba 9.0.0.
 
-`WhenHttp` works with any endpoint Alba can call. Its tests run against WolverineFx.Http 6.44.0 endpoints; the package does not depend on WolverineFx.Http.
+The harness library references Alba, Marten and WolverineFx only. A host running WolverineFx 6.44 or later in the default `TypeLoadMode.Dynamic` also needs `WolverineFx.RuntimeCompilation`. That is the host's dependency, not the harness's.
+
+`WhenHttp` works with any endpoint Alba can call. Its tests run against WolverineFx.Http endpoints at the same versions as WolverineFx. The package does not depend on WolverineFx.Http.
 
 ## v1 limits
 
@@ -28,11 +30,11 @@ The harness always uses the host's main `IDocumentStore` and Guid stream ids.
 
 ## Behaviour that depends on the Critter Stack version
 
-These were verified against the versions above and are covered by tests, so an upgrade that changes them fails the build:
+These were verified against the minimum versions and are covered by tests, which run on both the minimums and the latest releases, so a release that changes them fails the build or the compatibility run:
 
 - `ForceAllMartenDaemonActivityToCatchUpAsync` needs a registered `IProjectionCoordinator`.
 - `WaitForNonStaleProjectionDataAsync` always times out without a daemon.
-- A top-level handler exception is rethrown as-is under tracking; a cascaded one is wrapped in `AggregateException`.
+- A top-level handler exception is rethrown as-is under tracking. A cascaded one is wrapped in `AggregateException`.
 - A tracking timeout and a handler's own `TimeoutException` both arrive wrapped in "This TrackedSession timed out…".
 - A missing handler throws `IndeterminateRoutesException`.
 - `InvokeAsync<T>` returns `default(T)` instead of throwing when the handler returns a different type.

@@ -1,0 +1,101 @@
+# Runs the floor-built harness against the newest stable Marten, WolverineFx and Alba (ADR-0018).
+# Separate from build.yml on purpose: an upstream release that breaks the harness must not block our own builds
+# or releases, which are proven on the floor versions. A failure opens (or comments on) one issue labelled
+# "compatibility"; the next green run closes it.
+name: Compatibility
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays 06:17 UTC
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  issues: write
+
+concurrency:
+  group: compatibility
+  cancel-in-progress: true
+
+jobs:
+  latest:
+    name: Latest Critter Stack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Configure GitHub Packages credentials
+        run: |
+          dotnet nuget update source github \
+            --username github \
+            --password ${{ secrets.GITHUB_TOKEN }} \
+            --store-password-in-clear-text \
+            --configfile nuget.config
+
+      - name: Setup just
+        uses: extractions/setup-just@v3
+
+      # Sets MartenVersion, WolverineVersion and AlbaVersion for every later step.
+      - name: Resolve latest versions
+        run: |
+          scripts/latest-versions.sh --github-env
+          {
+            echo "### Testing against"
+            echo '```'
+            scripts/latest-versions.sh
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Test
+        run: just test
+
+      - name: Package check
+        run: just package-check
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-latest
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+
+      - name: Open or update compatibility issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create compatibility --color B60205 \
+            --description "The harness fails on the newest Critter Stack releases" --force
+          body="The harness fails against the newest stable releases ($MartenVersion Marten, $WolverineVersion WolverineFx, $AlbaVersion Alba). Run: $RUN_URL. See ADR-0018: fix the harness (keeping the floor building), or raise the floor."
+          existing=$(gh issue list --label compatibility --state open --json number --jq '.[0].number // empty')
+          if [[ -n "$existing" ]]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --label compatibility \
+              --title "Fails on Marten $MartenVersion / WolverineFx $WolverineVersion / Alba $AlbaVersion" \
+              --body "$body"
+          fi
+
+      - name: Close compatibility issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for n in $(gh issue list --label compatibility --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Green again on Marten $MartenVersion, WolverineFx $WolverineVersion, Alba $AlbaVersion: $RUN_URL"
+          done

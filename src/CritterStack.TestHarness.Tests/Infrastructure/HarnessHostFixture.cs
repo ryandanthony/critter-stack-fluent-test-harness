@@ -82,7 +82,8 @@ public abstract class HarnessHostFixture : IAsyncLifetime
         AddMarten(builder.Services);
         AddWolverine(builder);
 
-        _host = await AlbaHost.For(builder, MapEndpoints).ConfigureAwait(false);
+        // No ConfigureAwait: Alba 8 returns a Task, Alba 9 an awaitable AlbaHostBuilder, and this must build on both.
+        _host = await AlbaHost.For(builder, MapEndpoints);
     }
 
     private static void AddWolverine(WebApplicationBuilder builder)

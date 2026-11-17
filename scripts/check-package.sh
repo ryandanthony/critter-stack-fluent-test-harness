@@ -52,5 +52,10 @@ cd "$work"
 echo "Restoring the consumer in $work against CritterStack.TestHarness $version (no repo build props)..."
 dotnet restore Svc.Tests/Svc.Tests.csproj -p:HarnessVersion="$version"
 dotnet build Svc.Tests/Svc.Tests.csproj -c Release --no-restore -p:HarnessVersion="$version"
+# The template defaults to the harness's floor versions; MartenVersion, WolverineVersion and AlbaVersion in the
+# environment (just package-check-latest) move the consumer to newer releases (ADR-0018). Show what resolved.
+echo "Consumer resolved:"
+jq -r '.libraries | keys[] | select(test("^(Alba|Marten|WolverineFx|CritterStack\\.TestHarness)/"))' \
+  Svc.Tests/obj/project.assets.json | sed 's/^/  /'
 echo "Running the consuming service's scenarios..."
 dotnet test --project Svc.Tests/Svc.Tests.csproj -c Release --no-build

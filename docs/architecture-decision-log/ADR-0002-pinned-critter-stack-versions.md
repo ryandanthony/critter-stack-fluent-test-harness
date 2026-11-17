@@ -1,6 +1,6 @@
 # ADR-0002: Pinned stack: .NET 10, Marten 9, Wolverine 6, Alba 8, xunit v3
 
-- **Status:** accepted
+- **Status:** accepted (exact Marten, WolverineFx and Alba pins superseded by [ADR-0018](./ADR-0018-critter-stack-floor-and-latest.md): those are now a floor, tested on the floor and on the latest releases)
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Files: `global.json`, `src/Directory.Packages.props`; Risks: verified 2026-10-01)

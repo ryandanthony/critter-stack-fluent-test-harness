@@ -26,6 +26,18 @@ pack: build
 package-check: pack
   ./scripts/check-package.sh
 
+# Show the newest stable Marten, WolverineFx and Alba on nuget.org (what the *-latest recipes test against).
+latest-versions:
+  ./scripts/latest-versions.sh
+
+# Run the suite with the floor-built harness against the newest stable Marten, WolverineFx and Alba (ADR-0018).
+test-latest:
+  env $(./scripts/latest-versions.sh | tr '\n' ' ') just test
+
+# package-check with the consumer on the newest stable Marten, WolverineFx and Alba (ADR-0018).
+package-check-latest:
+  env $(./scripts/latest-versions.sh | tr '\n' ' ') just package-check
+
 # Build the Docusaurus docs site from docs/ (strict: broken links fail). Needs Node 20.
 docs-site:
   cd website && npm ci && npm run build
