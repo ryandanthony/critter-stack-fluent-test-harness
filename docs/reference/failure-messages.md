@@ -23,6 +23,7 @@ These are test setup problems. They fail the scenario at the step where they hap
 | Query returned the wrong type | `expected the handler to return <TResponse>, but it returned <Actual>` | none |
 | Projection sync failed or timed out | `projection sync (<mode>) failed with <type> (ProjectionTimeout <timeout>)` | the sync exception |
 | A Given's write failed | `writing the Given failed with <type>. If the stream already exists, use a fresh id per test.` | for example `ExistingStreamIdCollisionException` |
+| A stream id is the wrong kind for the store (checked before any step runs) | `the stream id <id> is a string, but the store uses Guid stream ids (StreamIdentity.AsGuid). Pass a Guid, or a typed id that wraps a Guid.` (or the reverse) | none |
 | A factory threw | `building the events/command/query threw <type>` | the factory's exception |
 | A factory returned null | `the command/query factory returned null` | none |
 | A predicate threw | `the predicate threw <type>` | the predicate's exception |

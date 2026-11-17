@@ -18,15 +18,15 @@ The harness library references Alba, Marten and WolverineFx only. A host running
 
 `WhenHttp` works with any endpoint Alba can call. Its tests run against WolverineFx.Http endpoints at the same versions as WolverineFx. The package does not depend on WolverineFx.Http.
 
-## v1 limits
+## Limits
 
 | Not supported | What it would need |
 |---|---|
-| String stream ids (`StreamIdentity.AsString`) | `string` overloads of every stream method, and a test host configured for string ids. |
 | Ancillary document stores (`IDocumentStore` subtypes) | A generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the Marten host extensions. |
 | More than one tenant per scenario | Run one scenario per tenant. |
+| Strongly typed ids that wrap anything but a `Guid` or `string` | Nothing: Marten's stream identity is one or the other. |
 
-The harness always uses the host's main `IDocumentStore` and Guid stream ids.
+The harness always uses the host's main `IDocumentStore`. Stream ids can be a `Guid`, a `string` or a strongly typed id that wraps either, matching the store's `Events.StreamIdentity` ([PDR-0013](../product-decision-log/PDR-0013-string-and-strongly-typed-stream-ids.md)).
 
 ## Behaviour that depends on the Critter Stack version
 
@@ -38,3 +38,5 @@ These were verified against the minimum versions and are covered by tests, which
 - A tracking timeout and a handler's own `TimeoutException` both arrive wrapped in "This TrackedSession timed out…".
 - A missing handler throws `IndeterminateRoutesException`.
 - `InvokeAsync<T>` returns `default(T)` instead of throwing when the handler returns a different type.
+- `FetchStreamStateAsync` with a `string` id on a `Guid` store returns null instead of throwing, which is why the harness checks the id kind itself.
+- Strongly typed ids are unwrapped with JasperFx's `ValueTypeInfo`, the same rules Marten uses for value type identifiers.
