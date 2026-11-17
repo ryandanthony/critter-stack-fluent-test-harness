@@ -1,6 +1,6 @@
 # ADR-0015: Docusaurus site over docs/, deployed to GitHub Pages
 
-- **Status:** accepted
+- **Status:** accepted (2026-11-16: repo going public, see ADR-0013's status. After the rename the site URL is `https://ryandanthony.github.io/critter-stack-fluent-test-harness/`)
 - **Date:** 2026-11-16
 - **Deciders:** Ryan
 - **Source:** `nats-auth-callout-service` `docs-site/website` and `.github/workflows/docs.yml`, `awen` `website/`

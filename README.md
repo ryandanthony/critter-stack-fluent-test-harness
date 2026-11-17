@@ -1,4 +1,4 @@
-# critterstack-fluent-testharness
+# critter-stack-fluent-test-harness
 
 A fluent Given/When/Then test harness for services built on [Marten](https://martendb.io) and [Wolverine](https://wolverinefx.net). It plugs into your existing [Alba](https://jasperfx.github.io/alba/) test host, writes Givens as event streams, sends commands and queries through Wolverine and HTTP requests through Alba, and asserts on the events, messages, read models and responses that result.
 
@@ -24,7 +24,7 @@ await TestHarness
 
 ## Documentation
 
-Start with the [tutorial](https://github.com/ryandanthony/critterstack-fluent-testharness/blob/main/docs/tutorials/first-scenario.md), or see the [documentation index](https://github.com/ryandanthony/critterstack-fluent-testharness/blob/main/docs/index.md). (Absolute links, because this README is also the NuGet package readme.)
+Start with the [tutorial](https://github.com/ryandanthony/critter-stack-fluent-test-harness/blob/main/docs/tutorials/first-scenario.md), or see the [documentation index](https://github.com/ryandanthony/critter-stack-fluent-test-harness/blob/main/docs/index.md). (Absolute links, because this README is also the NuGet package readme.)
 
 Working on the harness itself? Decisions are recorded as [PDRs](docs/product-decision-log/README.md) and [ADRs](docs/architecture-decision-log/README.md), with the [design](docs/design/README.md) and [implementation plan](docs/implementation-plan/00-overview.md) alongside. See [AGENTS.md](AGENTS.md).
 

@@ -101,7 +101,7 @@ jobs:
           if-no-files-found: error
 
   # Manual only: Actions > Build > Run workflow > publish = true, on main. Never on push or PR.
-  # Needs a nuget.org trusted-publishing policy: owner ryandanthony, repo critterstack-fluent-testharness, workflow build.yml.
+  # Needs a nuget.org trusted-publishing policy: owner ryandanthony, repo critter-stack-fluent-test-harness, workflow build.yml.
   release:
     name: Release
     needs: build

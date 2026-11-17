@@ -15,9 +15,9 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   url: 'https://ryandanthony.github.io',
-  baseUrl: '/critterstack-fluent-testharness/',
+  baseUrl: '/critter-stack-fluent-test-harness/',
   organizationName: 'ryandanthony',
-  projectName: 'critterstack-fluent-testharness',
+  projectName: 'critter-stack-fluent-test-harness',
   trailingSlash: false,
 
   onBrokenLinks: 'throw',
@@ -68,7 +68,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // docs live outside website/, so the default editUrl + relative path would contain "../docs".
           editUrl: ({docPath}) =>
-            `https://github.com/ryandanthony/critterstack-fluent-testharness/edit/main/docs/${docPath}`,
+            `https://github.com/ryandanthony/critter-stack-fluent-test-harness/edit/main/docs/${docPath}`,
           exclude: ['**/node_modules/**'],
         },
         blog: false,
@@ -96,7 +96,7 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/ryandanthony/critterstack-fluent-testharness',
+          href: 'https://github.com/ryandanthony/critter-stack-fluent-test-harness',
           label: 'GitHub',
           position: 'right',
         },
@@ -132,7 +132,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/ryandanthony/critterstack-fluent-testharness',
+              href: 'https://github.com/ryandanthony/critter-stack-fluent-test-harness',
             },
             {
               label: 'NuGet',

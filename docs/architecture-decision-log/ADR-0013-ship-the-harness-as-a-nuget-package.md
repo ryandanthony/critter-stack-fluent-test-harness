@@ -1,6 +1,6 @@
 # ADR-0013: Ship the harness as a NuGet package
 
-- **Status:** accepted
+- **Status:** accepted (**Open** item resolved 2026-11-16: Ryan chose a public repo and nuget.org. The repo was renamed to `ryandanthony/critter-stack-fluent-test-harness`, and the trusted-publishing policy uses that name)
 - **Date:** 2026-11-16
 - **Deciders:** Ryan
 - **Supersedes:** [ADR-0004](./ADR-0004-self-contained-harness-project.md); the portability-check bullet of [ADR-0012](./ADR-0012-docs-and-portability-enforced-by-tests.md); the "no packing, tagging or publishing" bullet of [ADR-0011](./ADR-0011-build-quality-versioning-and-ci.md)
