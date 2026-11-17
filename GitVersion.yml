@@ -28,7 +28,8 @@ branches:
     is-release-branch: true
     is-main-branch: true
   feature:
-    regex: ^(feature|feat)[/-]
+    # GitVersion 6 fills {BranchName} from this named group; without it the label stays literal and pack fails.
+    regex: ^(feature|feat)[/-](?<BranchName>.+)
     mode: ContinuousDelivery
     label: '{BranchName}'
     increment: Inherit

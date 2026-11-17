@@ -22,6 +22,26 @@ Calls that aren't in this table don't compile. For example, a Given after a `Whe
 
 Nothing runs until `RunAsync` is called or the scenario is awaited.
 
+The stage interfaces are what the harness hands back. Call them; don't implement them. New members can be added to them in a minor release.
+
+## Stream ids
+
+Every method that names a stream (`GivenStream`, `ThenStream*`, `ThenAppended*`) comes in three forms, so it fits the store's `Events.StreamIdentity`:
+
+| Id | Form | Store |
+|---|---|---|
+| `Guid` | `GivenStream(Guid id, Func<Guid, object[]> events)`, `ThenAppended<TEvent>(Guid id, ...)` | `StreamIdentity.AsGuid` (Marten's default) |
+| `string` | `GivenStream(string id, Func<string, object[]> events)`, `ThenAppended<TEvent>(string id, ...)` | `StreamIdentity.AsString` |
+| strongly typed id `TId` | `GivenStream<TId>(TId id, Func<TId, object[]> events)`, `ThenAppended<TEvent, TId>(TId id, ...)` | whichever kind `TId` wraps |
+
+- **Strongly typed ids** are any type Marten accepts as a value type identifier: a single public, gettable property that wraps a `Guid` or a `string`, such as `record struct OrderId(Guid Value)`, a Vogen or StronglyTypedId type. The harness unwraps the id as Marten does; the events factory gets the typed id back. Where an event type is named, give both type arguments (`ThenAppended<OrderShipped, OrderId>(orderId)`), because C# can't infer just one. `ThenStreamEventCount(orderId, n)` and `ThenAppendedCount(orderId, n)` infer `TId`.
+- A typed id and the value it wraps name the same stream, so `GivenStream(orderId, ...)` and `ThenAppendedCount(orderId.Value, 1)` agree.
+- **Fails when the scenario is built:** `ArgumentException` for a blank string id, a `TId` that isn't a single-value wrapper, or one that wraps anything but a `Guid` or `string` (or an empty string); `ArgumentNullException` for a null id.
+- **Fails before any step runs (not claimable):** an id of the wrong kind for the store, for example a `string` on a `Guid` store. See [failure messages](failure-messages.md#infrastructure-failures).
+- Step labels show a `Guid` as is, a `string` in quotes (`"order-17"`) and a typed id with its type (`OrderId(3f0c…)`).
+
+The sections below list the `Guid` form. The `string` and typed forms behave the same.
+
 ## `TestHarness`
 
 ### `Setup(IHost host, Action<HarnessOptions>? configure = null)`
@@ -45,6 +65,8 @@ Everything on `IGivenStage`, plus:
 ### `GivenStream(Guid id, Func<Guid, object[]> events)`
 
 ### `GivenStream<TAggregate>(Guid id, Func<Guid, object[]> events)`
+
+Also `GivenStream(string id, Func<string, object[]> events)`, `GivenStream<TAggregate>(string id, ...)`, `GivenStream<TId>(TId id, Func<TId, object[]> events)` and `GivenStream<TAggregate, TId>(TId id, ...)` (see [stream ids](#stream-ids)).
 
 - **Returns:** `IGivenStage`.
 - **Does:** writes the events to stream `id` in one `SaveChangesAsync`. The scenario's first Given for an id starts the stream (`StartStream`, or `StartStream<TAggregate>`); later Givens for the same id append. `TAggregate` is ignored on an append. Marks projections as needing a sync.
@@ -71,7 +93,7 @@ Everything on `IGivenStage`, plus:
 
 ## `IThenStage<TSelf>` (on `ICommandStage`, `IQueryStage<T>` and `IHttpStage`)
 
-Whole-stream assertions read the full stream with `FetchStreamAsync`, including events from Givens and earlier commands.
+Whole-stream assertions read the full stream with `FetchStreamAsync`, including events from Givens and earlier commands. Each also takes a `string` id or a typed id (`ThenStreamHasEvent<TEvent, TId>`, `ThenStreamHasNoEvent<TEvent, TId>`, `ThenStreamEventCount<TId>`), see [stream ids](#stream-ids).
 
 ### `ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null)`
 
@@ -99,7 +121,7 @@ The same as on `IGivenStage`.
 
 ## `ICommandStage`
 
-Appended-event assertions only see events the most recent `When` appended: the harness snapshots each stream's version before the `When` and reads from the next version on.
+Appended-event assertions only see events the most recent `When` appended: the harness snapshots each stream's version before the `When` and reads from the next version on. Each also takes a `string` id or a typed id (`ThenAppended<TEvent, TId>`, `ThenNotAppended<TEvent, TId>`, `ThenAppendedCount<TId>`), see [stream ids](#stream-ids).
 
 ### `ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null)`
 

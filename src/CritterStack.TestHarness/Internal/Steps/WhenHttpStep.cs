@@ -33,7 +33,7 @@ internal sealed class WhenHttpStep : ISnapshottingStep
     }
 
     /// <inheritdoc/>
-    public HashSet<Guid> SnapshotIds { get; } = [];
+    public HashSet<StreamKey> SnapshotIds { get; } = [];
 
     /// <summary>
     /// Gets or sets a value indicating whether a <c>ThenStatusCode</c> follows this step before the next action, set

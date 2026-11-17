@@ -52,7 +52,7 @@ await TestHarness
     .ThenAppended<WidgetRenamed>(id);
 ```
 
-Use a new `Guid` for every stream in every test. The harness never clears the database.
+Use a new `Guid` for every stream in every test. The harness never clears the database. If your store keys streams by string, or your ids are strongly typed, see [use string and strongly typed stream ids](use-string-and-typed-stream-ids.md).
 
 ## 5. Pick a projection sync mode
 

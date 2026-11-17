@@ -22,6 +22,7 @@ The docs are split by what you need right now.
 - [Test multi-tenant handlers](how-to/test-multi-tenant-handlers.md)
 - [Query read models](how-to/query-read-models.md)
 - [Test HTTP endpoints](how-to/test-http-endpoints.md)
+- [Use string and strongly typed stream ids](how-to/use-string-and-typed-stream-ids.md)
 - [Debug a failing scenario](how-to/debug-a-failing-scenario.md)
 
 ## Reference
@@ -29,7 +30,7 @@ The docs are split by what you need right now.
 - [API](reference/api.md): every stage and method.
 - [Harness options](reference/harness-options.md)
 - [Failure messages](reference/failure-messages.md)
-- [Compatibility](reference/compatibility.md): supported versions and v1 limits.
+- [Compatibility](reference/compatibility.md): supported versions and limits.
 
 ## Explanation
 

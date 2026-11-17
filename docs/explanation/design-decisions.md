@@ -24,9 +24,14 @@ The harness never resets or cleans the database. Truncating tables breaks parall
 
 Failures show event, response and message payloads as JSON, and keep the original exception. An earlier draft left payloads out in case they held personal data. That was dropped: the harness only runs in tests, and the data is what makes a failure quick to understand.
 
+## Guid, string and typed stream ids
+
+Stream methods take whatever id the service uses: a `Guid`, a `string` for a store with `StreamIdentity.AsString`, or a strongly typed id such as `OrderId` that wraps either. v1 took only `Guid`, since that covered the first services, and adding the others looked like it would double every step. It didn't: inside the harness every id becomes one internal stream key, so the steps are shared and only the public overloads multiply. A typed id is unwrapped with Marten's own value type rules, so whatever Marten accepts as an identifier works here too.
+
+An id of the wrong kind fails before the scenario runs. Marten catches most of these itself, but not all: reading a stream's version with a string on a Guid store just returns nothing, so an appended-event assertion could quietly read the wrong events.
+
 ## What v1 leaves out
 
-- **String stream ids.** Supporting them doubles every stream method and needs a second test host. Guid ids cover the services this was built for.
 - **Ancillary document stores.** Projection sync would need to know the store's type to call the right Marten overloads. A `UseStore<TStore>()` option could add this later.
 - **Several tenants in one scenario.** See above.
 

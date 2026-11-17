@@ -48,7 +48,7 @@ internal sealed class ScenarioContext
 
     /// <summary>Gets the stream ids this scenario's Givens have already started.</summary>
     /// <value>The started stream ids.</value>
-    internal HashSet<Guid> StartedStreams { get; } = [];
+    internal HashSet<StreamKey> StartedStreams { get; } = [];
 
     /// <summary>Gets or sets the watcher that records daemon shards pausing with an error during this scenario.</summary>
     /// <value>The watcher, or null when the host runs no daemon or the sync mode isn't <c>CatchUp</c>.</value>
@@ -56,7 +56,7 @@ internal sealed class ScenarioContext
 
     /// <summary>Gets each snapshotted stream's version, taken just before the most recent <c>When</c>.</summary>
     /// <value>Stream id to version.</value>
-    internal Dictionary<Guid, long> Snapshots { get; } = [];
+    internal Dictionary<StreamKey, long> Snapshots { get; } = [];
 
     /// <summary>Gets or sets a value indicating whether anything was written since the last projection sync.</summary>
     /// <value>True when a sync is needed.</value>

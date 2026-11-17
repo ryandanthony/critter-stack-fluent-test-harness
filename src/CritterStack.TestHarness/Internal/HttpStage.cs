@@ -39,15 +39,39 @@ internal sealed class HttpStage : IHttpStage
 
     /// <inheritdoc/>
     public IHttpStage ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Appended, StreamCheck.Has, predicate));
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenAppended<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.ForTyped(id), StreamScope.Appended, predicate));
 
     /// <inheritdoc/>
     public IHttpStage ThenNotAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Appended, StreamCheck.HasNo, predicate));
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenNotAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Appended, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenNotAppended<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.ForTyped(id), StreamScope.Appended, predicate));
 
     /// <inheritdoc/>
     public IHttpStage ThenAppendedCount(Guid id, int expected) =>
-        Add(StreamAssertionStep.ForCount(id, StreamScope.Appended, expected));
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Appended, expected));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenAppendedCount(string id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Appended, expected));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenAppendedCount<TId>(TId id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.ForTyped(id), StreamScope.Appended, expected));
 
     /// <inheritdoc/>
     public IHttpStage ThenPublished<TMessage>(Func<TMessage, bool>? predicate = null) =>
@@ -55,15 +79,39 @@ internal sealed class HttpStage : IHttpStage
 
     /// <inheritdoc/>
     public IHttpStage ThenStreamHasEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Whole, StreamCheck.Has, predicate));
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenStreamHasEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenStreamHasEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.Has(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IHttpStage ThenStreamHasNoEvent<TEvent>(Guid id, Func<TEvent, bool>? predicate = null) =>
-        Add(StreamAssertionStep.ForEvent(id, StreamScope.Whole, StreamCheck.HasNo, predicate));
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenStreamHasNoEvent<TEvent>(string id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.For(id), StreamScope.Whole, predicate));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenStreamHasNoEvent<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null) =>
+        Add(StreamAssertionStep.HasNo(StreamKey.ForTyped(id), StreamScope.Whole, predicate));
 
     /// <inheritdoc/>
     public IHttpStage ThenStreamEventCount(Guid id, int expected) =>
-        Add(StreamAssertionStep.ForCount(id, StreamScope.Whole, expected));
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenStreamEventCount(string id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.For(id), StreamScope.Whole, expected));
+
+    /// <inheritdoc/>
+    public IHttpStage ThenStreamEventCount<TId>(TId id, int expected) =>
+        Add(StreamAssertionStep.ForCount(StreamKey.ForTyped(id), StreamScope.Whole, expected));
 
     /// <inheritdoc/>
     public IHttpStage ThenThrows<TException>(Func<TException, bool>? predicate = null)

@@ -1,6 +1,6 @@
 # ADR-0003: Test against real Postgres with Testcontainers and per-host schemas
 
-- **Status:** accepted
+- **Status:** accepted (extended by [ADR-0019](./ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md): a fourth host with string stream ids)
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Tests: fixtures), commits `b84d1af`, `01a7e35`

@@ -37,6 +37,59 @@ public interface IGivenStage
         where TAggregate : class;
 
     /// <summary>
+    /// Writes events to the string-keyed stream <paramref name="id"/>, for a store with
+    /// <c>StreamIdentity.AsString</c>. Otherwise the same as <see cref="GivenStream(Guid, Func{Guid, object[]})"/>.
+    /// </summary>
+    /// <param name="id">The stream key.</param>
+    /// <param name="events">Builds the events from the stream key. Called when the step runs, not when it is recorded.</param>
+    /// <returns>The Given stage.</returns>
+    IGivenStage GivenStream(string id, Func<string, object[]> events);
+
+    /// <summary>
+    /// Writes events to the string-keyed stream <paramref name="id"/>, starting it as an aggregate of type
+    /// <typeparamref name="TAggregate"/> if this is the first Given for the id. Otherwise the same as
+    /// <see cref="GivenStream{TAggregate}(Guid, Func{Guid, object[]})"/>.
+    /// </summary>
+    /// <typeparam name="TAggregate">The stream's aggregate type.</typeparam>
+    /// <param name="id">The stream key.</param>
+    /// <param name="events">Builds the events from the stream key. Called when the step runs, not when it is recorded.</param>
+    /// <returns>The Given stage.</returns>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The aggregate type is chosen by the caller and has no value to infer it from.")]
+    IGivenStage GivenStream<TAggregate>(string id, Func<string, object[]> events)
+        where TAggregate : class;
+
+    /// <summary>
+    /// Writes events to the stream named by the strongly typed id <paramref name="id"/>. The harness unwraps the id
+    /// to the Guid or string it holds, using Marten's value type rules, and that value must match the store's
+    /// <c>StreamIdentity</c>. Otherwise the same as <see cref="GivenStream(Guid, Func{Guid, object[]})"/>.
+    /// </summary>
+    /// <typeparam name="TId">The id type: a single public, gettable property wrapping a Guid or a string.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="events">Builds the events from the typed id. Called when the step runs, not when it is recorded.</param>
+    /// <returns>The Given stage.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="id"/> or <paramref name="events"/> is null.</exception>
+    /// <exception cref="ArgumentException"><typeparamref name="TId"/> doesn't wrap a single Guid or string, or the
+    /// string it wraps is empty.</exception>
+    IGivenStage GivenStream<TId>(TId id, Func<TId, object[]> events);
+
+    /// <summary>
+    /// Writes events to the stream named by the strongly typed id <paramref name="id"/>, starting it as an aggregate
+    /// of type <typeparamref name="TAggregate"/> if this is the first Given for the id. See
+    /// <see cref="GivenStream{TId}(TId, Func{TId, object[]})"/> for how the id is unwrapped.
+    /// </summary>
+    /// <typeparam name="TAggregate">The stream's aggregate type.</typeparam>
+    /// <typeparam name="TId">The id type: a single public, gettable property wrapping a Guid or a string.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="events">Builds the events from the typed id. Called when the step runs, not when it is recorded.</param>
+    /// <returns>The Given stage.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="id"/> or <paramref name="events"/> is null.</exception>
+    /// <exception cref="ArgumentException"><typeparamref name="TId"/> doesn't wrap a single Guid or string, or the
+    /// string it wraps is empty.</exception>
+    [SuppressMessage("Major Code Smell", "S4018:Generic methods should provide type parameters", Justification = "The aggregate type is chosen by the caller and has no value to infer it from.")]
+    IGivenStage GivenStream<TAggregate, TId>(TId id, Func<TId, object[]> events)
+        where TAggregate : class;
+
+    /// <summary>
     /// Invokes a command through Wolverine under message tracking, after running projection sync if anything was
     /// written since the last sync. A handler exception is captured for <c>ThenThrows</c>.
     /// </summary>

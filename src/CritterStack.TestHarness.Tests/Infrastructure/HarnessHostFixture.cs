@@ -69,6 +69,30 @@ public abstract class HarnessHostFixture : IAsyncLifetime
     {
     }
 
+    /// <summary>
+    /// Sets the event store's stream identity and registers the host's projections. The default is Guid streams with
+    /// the Widget projections; the string-id host replaces both.
+    /// </summary>
+    /// <param name="options">The Marten options.</param>
+    protected virtual void ConfigureStreams(StoreOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        options.Projections.Add<WidgetDetailsProjection>(ProjectionLifecycle.Inline);
+        options.Projections.Add<WidgetSummaryProjection>(ProjectionLifecycle.Async);
+    }
+
+    /// <summary>
+    /// Gets the handler classes Wolverine discovers on this host.
+    /// </summary>
+    /// <value>The handler types.</value>
+    protected virtual IReadOnlyList<Type> HandlerTypes => [typeof(WidgetHandlers)];
+
+    /// <summary>
+    /// Gets the class name suffix of the Wolverine.Http endpoint classes this host maps.
+    /// </summary>
+    /// <value>The suffix, such as <c>WidgetEndpoints</c>.</value>
+    protected virtual string EndpointSuffix => nameof(WidgetEndpoints);
+
     /// <inheritdoc/>
     public async ValueTask InitializeAsync()
     {
@@ -86,21 +110,24 @@ public abstract class HarnessHostFixture : IAsyncLifetime
         _host = await AlbaHost.For(builder, MapEndpoints);
     }
 
-    private static void AddWolverine(WebApplicationBuilder builder)
+    private void AddWolverine(WebApplicationBuilder builder)
     {
         builder.Services.DisableAllExternalWolverineTransports();
         builder.Services.AddWolverineHttp();
         builder.Host.UseWolverine(options =>
         {
             options.Policies.AutoApplyTransactions();
-            options.Discovery.IncludeType(typeof(WidgetHandlers));
+            foreach (var type in HandlerTypes)
+            {
+                options.Discovery.IncludeType(type);
+            }
         });
     }
 
-    private static void MapEndpoints(WebApplication app) =>
+    private void MapEndpoints(WebApplication app) =>
         app.MapWolverineEndpoints(http =>
         {
-            http.CustomizeHttpEndpointDiscovery(q => q.Includes.WithNameSuffix(nameof(WidgetEndpoints)));
+            http.CustomizeHttpEndpointDiscovery(q => q.Includes.WithNameSuffix(EndpointSuffix));
             http.TenantId.IsRequestHeaderValue(TenantHeader);
         });
 
@@ -113,8 +140,7 @@ public abstract class HarnessHostFixture : IAsyncLifetime
                 options.Events.DatabaseSchemaName = SchemaName;
                 options.Events.TenancyStyle = TenancyStyle.Conjoined;
                 options.Policies.AllDocumentsAreMultiTenanted();
-                options.Projections.Add<WidgetDetailsProjection>(ProjectionLifecycle.Inline);
-                options.Projections.Add<WidgetSummaryProjection>(ProjectionLifecycle.Async);
+                ConfigureStreams(options);
                 ConfigureMarten(options);
             })
             .IntegrateWithWolverine(integration => integration.MessageStorageSchemaName = SchemaName + "_wolverine");

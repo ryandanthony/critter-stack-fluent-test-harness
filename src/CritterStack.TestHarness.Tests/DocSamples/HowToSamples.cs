@@ -35,6 +35,21 @@ public sealed class HowToSamples(NoDaemonHostFixture fixture)
             .ThenAppended<WidgetRenamed>(id);
     }
 
+    // Sample: use-string-and-typed-stream-ids.md, "Strongly typed ids".
+    [Fact]
+    [Trait("business_value", "The stream-id guide's typed-id sample works as documented.")]
+    public async Task UseStreamIds_typed_ids()
+    {
+        var id = new ParcelId(Guid.NewGuid());
+
+        await TestHarness
+            .Setup(fixture.Host)
+            .GivenStream<Parcel, ParcelId>(id, p => [new ParcelCreated(p, "box")])
+            .When(() => new ShipParcel(id))
+            .ThenAppended<ParcelShipped, ParcelId>(id, e => e.Id == id)
+            .ThenAppendedCount(id, 1);
+    }
+
     // Sample: choose-projection-sync.md, "CatchUp".
     [Fact]
     [Trait("business_value", "The CatchUp sample in the projection-sync guide works on a host with no daemon.")]

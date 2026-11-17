@@ -43,6 +43,27 @@ public interface IHttpStage : IThenStage<IHttpStage>
     IHttpStage ThenAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
 
     /// <summary>
+    /// Asserts that the most recent <c>WhenHttp</c> appended at least one matching <typeparamref name="TEvent"/> to
+    /// the string-keyed stream.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <param name="id">The stream key.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type matches.</param>
+    /// <returns>The HTTP stage.</returns>
+    IHttpStage ThenAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
+    /// Asserts that the most recent <c>WhenHttp</c> appended at least one matching <typeparamref name="TEvent"/> to
+    /// the stream named by a strongly typed id.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <typeparam name="TId">The id type: a single public, gettable property wrapping a Guid or a string.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type matches.</param>
+    /// <returns>The HTTP stage.</returns>
+    IHttpStage ThenAppended<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
     /// Asserts that the most recent <c>WhenHttp</c> appended no <typeparamref name="TEvent"/> matching
     /// <paramref name="predicate"/> to the stream.
     /// </summary>
@@ -53,12 +74,52 @@ public interface IHttpStage : IThenStage<IHttpStage>
     IHttpStage ThenNotAppended<TEvent>(Guid id, Func<TEvent, bool>? predicate = null);
 
     /// <summary>
+    /// Asserts that the most recent <c>WhenHttp</c> appended no matching <typeparamref name="TEvent"/> to the
+    /// string-keyed stream.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <param name="id">The stream key.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type counts.</param>
+    /// <returns>The HTTP stage.</returns>
+    IHttpStage ThenNotAppended<TEvent>(string id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
+    /// Asserts that the most recent <c>WhenHttp</c> appended no matching <typeparamref name="TEvent"/> to the stream
+    /// named by a strongly typed id.
+    /// </summary>
+    /// <typeparam name="TEvent">The event type.</typeparam>
+    /// <typeparam name="TId">The id type: a single public, gettable property wrapping a Guid or a string.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="predicate">Optional filter. When null, any event of the type counts.</param>
+    /// <returns>The HTTP stage.</returns>
+    IHttpStage ThenNotAppended<TEvent, TId>(TId id, Func<TEvent, bool>? predicate = null);
+
+    /// <summary>
     /// Asserts that the most recent <c>WhenHttp</c> appended exactly <paramref name="expected"/> events to the stream.
     /// </summary>
     /// <param name="id">The stream id.</param>
     /// <param name="expected">The expected number of appended events.</param>
     /// <returns>The HTTP stage.</returns>
     IHttpStage ThenAppendedCount(Guid id, int expected);
+
+    /// <summary>
+    /// Asserts that the most recent <c>WhenHttp</c> appended exactly <paramref name="expected"/> events to the
+    /// string-keyed stream.
+    /// </summary>
+    /// <param name="id">The stream key.</param>
+    /// <param name="expected">The expected number of appended events.</param>
+    /// <returns>The HTTP stage.</returns>
+    IHttpStage ThenAppendedCount(string id, int expected);
+
+    /// <summary>
+    /// Asserts that the most recent <c>WhenHttp</c> appended exactly <paramref name="expected"/> events to the stream
+    /// named by a strongly typed id.
+    /// </summary>
+    /// <typeparam name="TId">The id type, inferred from <paramref name="id"/>.</typeparam>
+    /// <param name="id">The stream id.</param>
+    /// <param name="expected">The expected number of appended events.</param>
+    /// <returns>The HTTP stage.</returns>
+    IHttpStage ThenAppendedCount<TId>(TId id, int expected);
 
     /// <summary>
     /// Asserts that the most recent <c>WhenHttp</c> published or sent at least one <typeparamref name="TMessage"/>

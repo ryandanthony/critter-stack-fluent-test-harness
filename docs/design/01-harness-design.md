@@ -73,9 +73,11 @@ flowchart LR
   - `ProjectionTimeout`
   - `TrackingTimeout`
   - `IncludeExternalMessages` (Wolverine tracking)
-- **v1 scope: main store, Guid stream ids.** The harness always uses the host's main `IDocumentStore` and supports only `StreamIdentity.AsGuid`. Stream methods take a `Guid` id and come in plain and `<TAggregate>` forms. Not in v1:
-  - **String stream ids** (`StreamIdentity.AsString`): would add `string` overloads of every stream method, plus a test host configured for string ids.
-  - **Ancillary stores** (`IDocumentStore` subtypes): would need a generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the host sync methods.
+- **Scope: main store; Guid, string and strongly typed stream ids.** The harness always uses the host's main `IDocumentStore`. Stream methods come in plain and `<TAggregate>` forms, each taking a `Guid`, a `string` (for `StreamIdentity.AsString`) or a strongly typed id `TId` that wraps either ([PDR-0013](../product-decision-log/PDR-0013-string-and-strongly-typed-stream-ids.md), [ADR-0019](../architecture-decision-log/ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md)):
+  - every id becomes one internal `StreamKey` (a `Guid` or a `string` plus a display label) when the step is recorded, so the steps, snapshots and started-stream set have a single code path. Typed ids are unwrapped with JasperFx's `ValueTypeInfo`, Marten's own value type rules; the events factory still gets the id in the form the test passed;
+  - before the first step, the runner checks every stream step's key against `Store.Options.Events.StreamIdentity` and fails on a mismatch. Marten doesn't catch every case (`FetchStreamStateAsync(string)` on a Guid store returns null), and its messages vary by call;
+  - v1 took only `Guid` ids; string and typed ids were added after v1.
+- **Not supported: ancillary stores** (`IDocumentStore` subtypes): would need a generic `UseStore<TStore>()` option so projection sync can call the `<TStore>` overloads of the host sync methods.
 - **Multi-tenancy:** one tenant per scenario. `Setup` returns `IScenarioStart`, which adds `ForTenant(tenantId)` on top of `IGivenStage`. `ForTenant` returns a plain `IGivenStage`, so it can only be called once, straight after `Setup` and before any Given. If it isn't called, the scenario uses Marten's default tenant. When a tenant is set, every step uses it:
   - Givens and all Then reads open sessions with `store.LightweightSession(tenantId)`;
   - `When` runs `host.TrackActivity().Timeout(TrackingTimeout)[.IncludeExternalTransports()].ExecuteAndWaitAsync(c => c.InvokeForTenantAsync(tenantId, command))`;
@@ -84,7 +86,7 @@ flowchart LR
   - Verified: the handler's `IDocumentSession.TenantId` is the scenario's tenant under `InvokeForTenantAsync`, and `*DEFAULT*` (Marten's default tenant id) without one. A stream written for tenant `a` is invisible to tenant `b` (`FetchStreamAsync` returns no events, `FetchStreamStateAsync` returns `null`).
   - `ExecuteAndWaitAsync` has both `Func<IMessageContext, Task>` and `Func<IMessageContext, ValueTask>` overloads, so an `async` lambda is ambiguous (CS0121). Cast it to `Func<IMessageContext, Task>`.
 - **Givens:**
-  - `GivenStream(Guid id, Func<Guid, object[]> events)` and `GivenStream<TAggregate>(...)` write events to a stream. The scenario remembers which stream ids its Givens have already started:
+  - `GivenStream(Guid id, Func<Guid, object[]> events)` and `GivenStream<TAggregate>(...)` write events to a stream (with `string` and typed-id forms as above). The scenario remembers which stream ids its Givens have already started:
     - the first `GivenStream` for an id calls `session.Events.StartStream` (`StartStream<TAggregate>` for the generic form);
     - later `GivenStream` calls for the same id call `session.Events.Append`, so a stream's history can be built up over several Givens.
     - On an append, the `<TAggregate>` type argument is ignored, because the stream's aggregate type was set when it started. A mismatched `<TAggregate>` on a later Given is not an error.
@@ -193,6 +195,9 @@ public interface IGivenStage
 {
     IGivenStage GivenStream(Guid id, Func<Guid, object[]> events);
     IGivenStage GivenStream<TAggregate>(Guid id, Func<Guid, object[]> events) where TAggregate : class;
+    // Plus string and typed-id forms of each stream method (PDR-0013), for example:
+    IGivenStage GivenStream(string id, Func<string, object[]> events);
+    IGivenStage GivenStream<TAggregate, TId>(TId id, Func<TId, object[]> events) where TAggregate : class;
 
     ICommandStage When(Func<object> command);
     IQueryStage<TResponse> WhenQuery<TResponse>(Func<object> query);
@@ -351,7 +356,7 @@ Internals (namespace `CritterStack.TestHarness.Internal`, all `internal`):
 
 ## Tests
 
-> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md). The list below is the v1 baseline; the suite has grown since (159 tests at 2026-11-16 after WhenHttp, see the [implementation plan](../implementation-plan/00-overview.md)).
+> Records: [ADR-0003](../architecture-decision-log/ADR-0003-real-postgres-test-hosts.md), [ADR-0012](../architecture-decision-log/ADR-0012-docs-and-portability-enforced-by-tests.md), [ADR-0019](../architecture-decision-log/ADR-0019-one-stream-key-for-guid-string-and-typed-ids.md). The list below is the v1 baseline; the suite has grown since (159 tests at 2026-11-16 after WhenHttp, 185 after string and typed stream ids, see the [implementation plan](../implementation-plan/00-overview.md)). Since P06 there is a fourth host, `StringIdHostFixture` (schema `harness_stringids`, `StreamIdentity.AsString`, the string-keyed `Gadget` domain), and the no-daemon host also runs the `Parcel` domain, whose aggregate, events, `[AggregateHandler]` and async read model use the typed id `ParcelId(Guid Value)`.
 
 The harness gets its own test project, `src/CritterStack.TestHarness.Tests/`, which travels with the harness. It has its own tiny test domain and host:
 
@@ -449,12 +454,13 @@ docs/
     test-multi-tenant-handlers.md  ForTenant and tenant isolation
     query-read-models.md           When then WhenQuery, ThenResult
     test-http-endpoints.md         WhenHttp, ThenStatusCode, ThenResponse, HttpTenant (added 2026-11-16)
+    use-string-and-typed-stream-ids.md  string-keyed stores and strongly typed ids (added 2026-11-17)
     debug-a-failing-scenario.md    reading the failure message, payloads, InnerException
   reference/
     api.md                         every stage and method, laid out to mirror the stage interfaces, with the valid-next-step table
     harness-options.md             every HarnessOptions field: type, default, effect
     failure-messages.md            every failure the harness raises: when, message shape, claimable or not
-    compatibility.md               supported .NET, Marten, Wolverine and Alba versions; v1 limits (Guid ids, main store)
+    compatibility.md               supported .NET, Marten, Wolverine and Alba versions; limits (main store only)
   explanation/
     execution-model.md             deferred steps, the runner, why the chain is synchronous
     appended-vs-whole-stream.md    the two kinds of stream assertion and the version snapshot
