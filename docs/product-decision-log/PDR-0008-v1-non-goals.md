@@ -1,6 +1,6 @@
 # PDR-0008: v1 non-goals
 
-- **Status:** accepted (the NuGet bullet is superseded by [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md), the HTTP bullet by [PDR-0011](./PDR-0011-scenarios-can-test-http-endpoints.md))
+- **Status:** accepted (the NuGet bullet is superseded by [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md), the HTTP bullet by [PDR-0011](./PDR-0011-scenarios-can-test-http-endpoints.md), the string stream ids bullet by [PDR-0013](./PDR-0013-string-and-strongly-typed-stream-ids.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (v1 scope, No data wipe, CI), [reference/compatibility.md](../reference/compatibility.md) (v1 limits)

@@ -17,11 +17,12 @@ The [design](../design/README.md) unifies these PDRs with the [ADRs](../architec
 | [PDR-0005](./PDR-0005-failures-show-the-actual-data.md) | Failures show the actual data | accepted |
 | [PDR-0006](./PDR-0006-adopt-by-copying-the-project.md) | Services adopt the harness by copying the project | superseded by [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md) |
 | [PDR-0007](./PDR-0007-one-tenant-per-scenario.md) | One tenant per scenario | accepted |
-| [PDR-0008](./PDR-0008-v1-non-goals.md) | v1 non-goals | accepted (NuGet and HTTP bullets superseded by PDR-0010, PDR-0011) |
+| [PDR-0008](./PDR-0008-v1-non-goals.md) | v1 non-goals | accepted (NuGet, HTTP and string-id bullets superseded by PDR-0010, PDR-0011, PDR-0013) |
 | [PDR-0009](./PDR-0009-diataxis-docs-with-runnable-samples.md) | User docs follow Diátaxis, and every sample runs | accepted (no-site wording superseded by PDR-0012) |
 | [PDR-0010](./PDR-0010-adopt-as-a-nuget-package.md) | Services adopt the harness as a NuGet package | accepted |
 | [PDR-0011](./PDR-0011-scenarios-can-test-http-endpoints.md) | Scenarios can test HTTP endpoints | accepted |
 | [PDR-0012](./PDR-0012-docs-published-as-a-website.md) | User docs are published as a website | accepted |
+| [PDR-0013](./PDR-0013-string-and-strongly-typed-stream-ids.md) | Scenarios support string and strongly typed stream ids | accepted |
 
 ## Template
 
