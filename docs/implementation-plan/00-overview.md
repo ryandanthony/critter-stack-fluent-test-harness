@@ -17,13 +17,13 @@ Status: **ready** (fully specified), **outline** (written in full when it is nex
 |---|---|---|---|---|
 | P01 First consumer | One real service (Mise, which runs Marten + Wolverine, [mise ADR-0012](https://github.com/ryandanthony/mise/blob/main/docs/architecture-decision-log/ADR-0012-marten-and-wolverine.md)) adds the package and has at least one scenario per handler type green in its CI | PDR-0010 | P03 | outline |
 | P02 Tutorial walk-through | Someone new follows `tutorials/first-scenario.md` by hand from a clean clone; every gap found is fixed in the page and its `DocSamples/` test | PDR-0009 | none | outline |
-| P03 First publish | Resolve ADR-0013's **Open** item (repo visibility vs feed), add the nuget.org trusted-publishing policy, run the release workflow; `CritterStack.TestHarness` is installable | ADR-0013 | none | ready (public + nuget.org chosen 2026-11-16) |
+| P03 First publish | Resolve ADR-0013's **Open** item (repo visibility vs feed), add the nuget.org trusted-publishing policy, run the release workflow; `CritterStack.TestHarness` is installable | ADR-0013 | none | done (v1.3.3 on nuget.org, 2026-11-17) |
 | P04 Critter Stack upgrade | Bump Marten, Wolverine and Alba to current; any classifier or sync behaviour change caught by tests is handled and recorded (new ADR superseding ADR-0002 if pins change materially) | ADR-0002, 0007, 0008 | none | outline |
 | P05 NuGet package | Packable project, `just pack`, `just package-check`, CI artifact and manual release job | PDR-0010, ADR-0013 | none | done |
 | P06 String stream ids | `string` overloads of every stream method, second test host | new PDR superseding PDR-0008 | none | needs decision |
 | P07 Ancillary stores | `UseStore<TStore>()` option, projection sync through `<TStore>` overloads | new PDR superseding PDR-0008 | none | needs decision |
 | P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done |
-| P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change. Deploy waits for Pages (ADR-0015 **Open**) | PDR-0012, ADR-0015 | none | done (deploy pending P03) |
+| P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change. Deploy waits for Pages (ADR-0015 **Open**) | PDR-0012, ADR-0015 | none | done (live at https://ryandanthony.github.io/critter-stack-fluent-test-harness/) |
 | P10 Projection-error flake | Apply errors the daemon hits outside the forced catch-up fail the next action, so `ProjectionErrorTests` is stable on 1-CPU runners (CI was red on `main`) | ADR-0016 | none | done |
 
 ### Outlines

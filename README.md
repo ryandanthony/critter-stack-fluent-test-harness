@@ -24,7 +24,7 @@ await TestHarness
 
 ## Documentation
 
-Start with the [tutorial](https://github.com/ryandanthony/critter-stack-fluent-test-harness/blob/main/docs/tutorials/first-scenario.md), or see the [documentation index](https://github.com/ryandanthony/critter-stack-fluent-test-harness/blob/main/docs/index.md). (Absolute links, because this README is also the NuGet package readme.)
+The full docs are at **https://ryandanthony.github.io/critter-stack-fluent-test-harness/**. Start with the [tutorial](https://ryandanthony.github.io/critter-stack-fluent-test-harness/tutorials/first-scenario), or browse the [source docs on GitHub](https://github.com/ryandanthony/critter-stack-fluent-test-harness/blob/main/docs/index.md). (Absolute links, because this README is also the NuGet package readme.)
 
 Working on the harness itself? Decisions are recorded as [PDRs](docs/product-decision-log/README.md) and [ADRs](docs/architecture-decision-log/README.md), with the [design](docs/design/README.md) and [implementation plan](docs/implementation-plan/00-overview.md) alongside. See [AGENTS.md](AGENTS.md).
 
