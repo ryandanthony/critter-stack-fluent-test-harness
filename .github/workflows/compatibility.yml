@@ -9,6 +9,16 @@ on:
     - cron: "17 6 * * 1"   # Mondays 06:17 UTC
   push:
     branches: [main]
+  # PRs that touch the version plumbing prove it on the latest releases before merge. They never open issues.
+  pull_request:
+    branches: [main]
+    paths:
+      - src/Directory.Packages.props
+      - src/**/*.csproj
+      - samples/ConsumerService/**
+      - scripts/latest-versions.sh
+      - scripts/check-package.sh
+      - .github/workflows/compatibility.yml
   workflow_dispatch:
 
 permissions:
@@ -17,7 +27,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: compatibility
+  group: compatibility-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -73,7 +83,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Open or update compatibility issue
-        if: failure()
+        if: failure() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -91,7 +101,7 @@ jobs:
           fi
 
       - name: Close compatibility issue
-        if: success()
+        if: success() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
