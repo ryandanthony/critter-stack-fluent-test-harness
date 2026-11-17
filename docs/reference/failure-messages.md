@@ -21,7 +21,8 @@ These are test setup problems. They fail the scenario at the step where they hap
 | No handler is registered | `no Wolverine handler is registered for <Message>` | `IndeterminateRoutesException` |
 | Tracking timed out | `Wolverine tracking timed out after <TrackingTimeout> (TrackingTimeout) waiting for <Command> and its cascaded messages` | `TimeoutException` |
 | Query returned the wrong type | `expected the handler to return <TResponse>, but it returned <Actual>` | none |
-| Projection sync failed or timed out | `projection sync (<mode>) failed with <type> (ProjectionTimeout <timeout>)` | the sync exception |
+| Projection sync failed or timed out | `projection sync (<mode>) failed with <type> (ProjectionTimeout <timeout>)`, or `projection sync (<mode>) of <TStore> failed with ...` for an ancillary store | the sync exception |
+| A store isn't registered in the host (thrown at the `InStore` or `Setup` line, not as a step failure) | `<TStore> is not registered in the host. Register it with AddMartenStore<TStore>() before using it in a scenario.` | none (`InvalidOperationException`) |
 | A Given's write failed | `writing the Given failed with <type>. If the stream already exists, use a fresh id per test.` | for example `ExistingStreamIdCollisionException` |
 | A stream id is the wrong kind for the store (checked before any step runs) | `the stream id <id> is a string, but the store uses Guid stream ids (StreamIdentity.AsGuid). Pass a Guid, or a typed id that wraps a Guid.` (or the reverse) | none |
 | A factory threw | `building the events/command/query threw <type>` | the factory's exception |
