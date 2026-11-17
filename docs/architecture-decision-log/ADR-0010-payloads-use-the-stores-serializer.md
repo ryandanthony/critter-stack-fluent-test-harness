@@ -1,6 +1,6 @@
 # ADR-0010: Failure payloads use the store's own serializer
 
-- **Status:** accepted
+- **Status:** accepted (since [ADR-0020](./ADR-0020-ancillary-stores-per-step-and-synced-together.md), events use the serializer of the store the step reads)
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Failures)

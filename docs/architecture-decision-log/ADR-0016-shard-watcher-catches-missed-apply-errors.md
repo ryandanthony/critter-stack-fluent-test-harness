@@ -1,6 +1,6 @@
 # ADR-0016: A shard watcher catches apply errors the forced catch-up misses
 
-- **Status:** accepted
+- **Status:** accepted (since [ADR-0020](./ADR-0020-ancillary-stores-per-step-and-synced-together.md), one watcher per store the scenario syncs that has a coordinator)
 - **Date:** 2026-11-16
 - **Deciders:** Ryan
 - **Source:** flaky `ProjectionErrorTests.CatchUp_projection_error_fails_the_next_action_with_the_apply_error` (failed CI on `main` at f15852c and 5bc5eb7, and 4 of 8 runs on 1 CPU as far back as 01a7e35)

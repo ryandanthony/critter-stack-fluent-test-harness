@@ -1,6 +1,6 @@
 # ADR-0019: One stream key for Guid, string and strongly typed ids
 
-- **Status:** accepted
+- **Status:** accepted (since [ADR-0020](./ADR-0020-ancillary-stores-per-step-and-synced-together.md), stream state is keyed by store and `StreamKey`, and the id-kind check uses the step's store)
 - **Date:** 2026-11-17
 - **Deciders:** Ryan
 - **Source:** runtime probe against Marten 9.44.0 / WolverineFx 6.44.0 (JasperFx 2.79.1) and Marten 9.62.0 / WolverineFx 6.64.2, 2026-11-17

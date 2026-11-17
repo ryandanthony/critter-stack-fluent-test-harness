@@ -1,6 +1,6 @@
 # ADR-0007: Projection sync runs before actions, guarded by a dirty flag
 
-- **Status:** accepted (daemon path extended by [ADR-0016](./ADR-0016-shard-watcher-catches-missed-apply-errors.md): a shard watcher also catches apply errors the forced catch-up doesn't return)
+- **Status:** accepted (daemon path extended by [ADR-0016](./ADR-0016-shard-watcher-catches-missed-apply-errors.md): a shard watcher also catches apply errors the forced catch-up doesn't return; applied per store by [ADR-0020](./ADR-0020-ancillary-stores-per-step-and-synced-together.md))
 - **Date:** 2026-10-01
 - **Deciders:** Ryan
 - **Source:** `initial-design.md` (Setup: `ProjectionSync`, Projection sync), [explanation/projection-sync.md](../explanation/projection-sync.md)
