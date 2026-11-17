@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   build:
+    name: Docs site
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

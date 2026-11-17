@@ -1,13 +1,16 @@
 mode: ContinuousDelivery
 tag-prefix: v
+# No Mainline strategy: on main every commit since the last v tag shares the next version, so
+# docs/chore commits don't burn patch numbers. Release tags v{MajorMinorPatch} (ADR-0017).
 strategies:
-  - Mainline
   - TaggedCommit
 
 assembly-versioning-scheme: MajorMinor
 assembly-file-versioning-scheme: MajorMinorPatch
 assembly-informational-format: '{SemVer}+{ShortSha}'
 
+# Breaking changes are marked with "type!:" in the subject. A "BREAKING CHANGE:" footer alone is not
+# picked up by GitVersion 6.8 (tested), so it would ship as a patch.
 major-version-bump-message: '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\(.*\))?!:.*'
 minor-version-bump-message: '^feat(\(.*\))?:.*'
 patch-version-bump-message: '^fix(\(.*\))?:.*'
@@ -16,7 +19,7 @@ no-bump-message: '^(docs|style|chore|ci|build|test|refactor)(\(.*\))?:.*'
 branches:
   main:
     regex: ^main$
-    mode: ContinuousDeployment
+    mode: ContinuousDelivery
     label: ''
     increment: Patch
     prevent-increment:

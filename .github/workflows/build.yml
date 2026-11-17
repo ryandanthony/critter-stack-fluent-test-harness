@@ -7,8 +7,8 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      publish:
-        description: "Publish the package to nuget.org, tag and create a GitHub release (main only)"
+      force:
+        description: "Release even if there are no feat/fix/perf commits since the last tag (main only)"
         type: boolean
         default: false
 
@@ -22,6 +22,8 @@ env:
 
 jobs:
   build:
+    # This name is the required status check on main.
+    name: Build and test
     runs-on: ubuntu-latest
     outputs:
       majorMinorPatch: ${{ steps.version.outputs.majorMinorPatch }}
@@ -100,37 +102,105 @@ jobs:
             artifacts/*.snupkg
           if-no-files-found: error
 
-  # Manual only: Actions > Build > Run workflow > publish = true, on main. Never on push or PR.
-  # Needs a nuget.org trusted-publishing policy: owner ryandanthony, repo critter-stack-fluent-test-harness, workflow build.yml.
+  # Automatic release on every push to main whose commits since the last v tag include feat, fix,
+  # perf or a breaking change (scripts/release-plan.sh, ADR-0017). docs/chore/ci-only pushes don't
+  # release. workflow_dispatch with force = true releases anyway.
+  # Needs the nuget.org trusted-publishing policy: owner ryandanthony, repo critter-stack-fluent-test-harness,
+  # workflow build.yml. Runs only after the build job (tests, package check, docs check) passes.
   release:
     name: Release
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # One release at a time, never cancelled half way: tag and nuget.org push must stay in step.
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write   # tag + GitHub release
       id-token: write   # OIDC token for NuGet trusted publishing
+      packages: read    # FestinaLente.CodeStandards restore
 
     steps:
-      - name: Download packages
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          name: nupkg
-          path: artifacts
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # A newer push may have landed while the build ran. Only the newest main commit releases,
+      # so its tag covers everything before it.
+      - name: Skip if main moved on
+        id: current
+        run: |
+          git fetch --quiet origin main
+          if [[ "$(git rev-parse origin/main)" == "$GITHUB_SHA" ]]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "### Release skipped: main has moved on to $(git rev-parse --short origin/main)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Plan release
+        id: plan
+        if: steps.current.outputs.latest == 'true'
+        run: scripts/release-plan.sh "${{ inputs.force || 'false' }}"
+
+      - name: Release summary
+        if: steps.current.outputs.latest == 'true'
+        env:
+          RELEASE: ${{ steps.plan.outputs.release }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          REASON: ${{ steps.plan.outputs.reason }}
+        run: |
+          if [[ "$RELEASE" == "true" ]]; then
+            echo "### Releasing v$VERSION ($REASON)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No release: $REASON (next version would be $VERSION)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Tag locally first so GitVersion.MsBuild stamps the plain release version (no -N suffix).
+      - name: Tag locally
+        if: steps.plan.outputs.release == 'true'
+        run: git tag "v${{ steps.plan.outputs.version }}" "$GITHUB_SHA"
+
+      - name: Configure GitHub Packages credentials
+        if: steps.plan.outputs.release == 'true'
+        run: |
+          dotnet nuget update source github \
+            --username github \
+            --password ${{ secrets.GITHUB_TOKEN }} \
+            --store-password-in-clear-text \
+            --configfile nuget.config
+
+      # Already tested by the build job on this exact commit; this only rebuilds with the release version.
+      - name: Pack release
+        if: steps.plan.outputs.release == 'true'
+        run: |
+          dotnet build src/CritterStack.TestHarness/CritterStack.TestHarness.csproj --configuration Release
+          dotnet pack src/CritterStack.TestHarness/CritterStack.TestHarness.csproj --no-build --configuration Release --output artifacts
+          expected="artifacts/CritterStack.TestHarness.${{ steps.plan.outputs.version }}.nupkg"
+          ls artifacts
+          test -f "$expected" || { echo "expected $expected, the build stamped a different version" >&2; exit 1; }
 
       # Trusted publishing: exchange the GitHub OIDC token for a short-lived nuget.org API key.
       - name: NuGet login (OIDC)
+        if: steps.plan.outputs.release == 'true'
         uses: NuGet/login@v1
         id: nuget-login
         with:
           user: ryandanthony
 
+      # --skip-duplicate makes a re-run after a later failure safe.
       - name: Publish to nuget.org
+        if: steps.plan.outputs.release == 'true'
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
@@ -139,12 +209,13 @@ jobs:
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 
-      # The v tag also drives GitVersion for the next build.
+      # Pushes the v tag (which drives GitVersion for the next build) and creates the release.
       - name: GitHub release
+        if: steps.plan.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.majorMinorPatch }}
-          name: v${{ needs.build.outputs.majorMinorPatch }}
+          tag_name: v${{ steps.plan.outputs.version }}
+          name: v${{ steps.plan.outputs.version }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |

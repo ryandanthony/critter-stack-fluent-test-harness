@@ -309,10 +309,10 @@ Repo scaffolding:
   It keeps only the `stylecop.json` in its own folder (`$(MSBuildThisFileDirectory)`), so `Directory.Build.props`, `Directory.Build.targets` and `stylecop.json` must all stay together in `src/`. Moving one of them silently drops the repo's StyleCop settings.
 - `src/stylecop.json`: copied from awen (company name, copyright header, documentation and ordering rules), so analyzer settings match across repos.
 - `GitVersion.yml` (repo root): copied from `ryandanthony/awen` so versioning works the same way across repos:
-  - `mode: ContinuousDelivery`, `tag-prefix: v`, strategies `Mainline` and `TaggedCommit`;
+  - `mode: ContinuousDelivery`, `tag-prefix: v`, strategy `TaggedCommit` (Mainline dropped by [ADR-0017](../architecture-decision-log/ADR-0017-release-automatically-on-push-to-main.md));
   - assembly version `MajorMinor`, file version `MajorMinorPatch`, informational version `{SemVer}+{ShortSha}`;
   - Conventional Commit bump messages: `type!:` is major, `feat:` is minor, `fix:` is patch, and `docs`/`style`/`chore`/`ci`/`build`/`test`/`refactor` don't bump;
-  - branches: `main` (ContinuousDeployment, no label, patch increment), `feature/`/`feat/` (label `{BranchName}`), `NNN-` spec branches (label `alpha`) and `pull/`/`pr/` (label `pr`).
+  - branches: `main` (ContinuousDelivery, no label, patch increment, no Mainline strategy, [ADR-0017](../architecture-decision-log/ADR-0017-release-automatically-on-push-to-main.md)), `feature/`/`feat/` (label `{BranchName}`), `NNN-` spec branches (label `alpha`) and `pull/`/`pr/` (label `pr`).
   - `GitVersion.MsBuild` stamps the version into every assembly at build time and writes `obj/gitversion.json`, so there is no hand-maintained version anywhere in the repo.
 - `justfile` (repo root): `restore`, `build` (Release, over the slnx) and `test` (depends on `build`; runs `dotnet test --solution src/CritterStack.TestHarness.slnx --no-build --configuration Release --report-xunit-trx --results-directory TestResults`) recipes. Microsoft.Testing.Platform exits with code 8 when zero tests run, so `just test` fails until the first test exists.
 - `.github/workflows/build.yml`: CI, modelled on awen's `build.yml`. Runs on pull requests to `main`, pushes to `main` and `workflow_dispatch`, on `ubuntu-latest` (which has Docker, so Testcontainers works without setup). Steps:
@@ -325,7 +325,7 @@ Repo scaffolding:
   7. extract the version from `src/CritterStack.TestHarness/obj/gitversion.json` (`SemVer` and `MajorMinorPatch`) into step outputs and the job summary;
   8. `just test`;
   9. upload the `*.trx` files as a workflow artifact (`actions/upload-artifact@v4`, `if: always()`), so failed runs keep their results.
-  - Packing and publishing (added 2026-11-16, [ADR-0013](../architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)): every run packs and uploads the `.nupkg`/`.snupkg`, runs `just package-check`, and a manual `workflow_dispatch` with `publish: true` on `main` publishes to nuget.org via trusted publishing, tags `v{MajorMinorPatch}` and creates a GitHub release.
+  - Packing and publishing (added 2026-11-16, [ADR-0013](../architecture-decision-log/ADR-0013-ship-the-harness-as-a-nuget-package.md)): every run packs and uploads the `.nupkg`/`.snupkg` and runs `just package-check`. On every push to `main` the `release` job runs `scripts/release-plan.sh`, and if there is a `feat`/`fix`/`perf`/breaking commit since the last tag it publishes to nuget.org via trusted publishing, tags `v{MajorMinorPatch}` and creates a GitHub release ([ADR-0017](../architecture-decision-log/ADR-0017-release-automatically-on-push-to-main.md)).
 
 Harness library:
 

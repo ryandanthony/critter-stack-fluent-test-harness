@@ -18,12 +18,13 @@ The [design](../design/README.md) unifies these ADRs with the [PDRs](../product-
 | [ADR-0008](./ADR-0008-exception-classification-by-origin.md) | Exceptions are classified by origin, not only by type | accepted |
 | [ADR-0009](./ADR-0009-commands-tracked-queries-through-the-bus.md) | Commands run under Wolverine tracking, queries go straight through the bus | accepted (extended by ADR-0014) |
 | [ADR-0010](./ADR-0010-payloads-use-the-stores-serializer.md) | Failure payloads use the store's own serializer | accepted |
-| [ADR-0011](./ADR-0011-build-quality-versioning-and-ci.md) | Build quality, versioning and CI | accepted (no-publishing bullet superseded by ADR-0013) |
+| [ADR-0011](./ADR-0011-build-quality-versioning-and-ci.md) | Build quality, versioning and CI | accepted (no-publishing bullet superseded by ADR-0013, mainline mode by ADR-0017) |
 | [ADR-0012](./ADR-0012-docs-and-portability-enforced-by-tests.md) | Docs and portability are enforced by tests | accepted (portability bullet superseded by ADR-0013) |
-| [ADR-0013](./ADR-0013-ship-the-harness-as-a-nuget-package.md) | Ship the harness as a NuGet package | accepted |
+| [ADR-0013](./ADR-0013-ship-the-harness-as-a-nuget-package.md) | Ship the harness as a NuGet package | accepted (manual-release bullet superseded by ADR-0017) |
 | [ADR-0014](./ADR-0014-whenhttp-through-alba-under-tracking.md) | WhenHttp runs the Alba scenario under Wolverine tracking | accepted |
 | [ADR-0015](./ADR-0015-docusaurus-site-on-github-pages.md) | Docusaurus site over docs/, deployed to GitHub Pages | accepted |
 | [ADR-0016](./ADR-0016-shard-watcher-catches-missed-apply-errors.md) | A shard watcher catches apply errors the forced catch-up misses | accepted |
+| [ADR-0017](./ADR-0017-release-automatically-on-push-to-main.md) | Every push to main that ships a change releases automatically | accepted |
 
 ## Template
 

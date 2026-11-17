@@ -25,6 +25,7 @@ Status: **ready** (fully specified), **outline** (written in full when it is nex
 | P08 HTTP endpoints | `WhenHttp`, `IHttpStage`, `HttpTenant`, tests and how-to | PDR-0011, ADR-0014 | none | done |
 | P09 Docs site | Docusaurus site over `docs/` (`website/`, `just docs-site`), built on every docs change. Deploy waits for Pages (ADR-0015 **Open**) | PDR-0012, ADR-0015 | none | done (live at https://ryandanthony.github.io/critter-stack-fluent-test-harness/) |
 | P10 Projection-error flake | Apply errors the daemon hits outside the forced catch-up fail the next action, so `ProjectionErrorTests` is stable on 1-CPU runners (CI was red on `main`) | ADR-0016 | none | done |
+| P11 Automatic releases | Every push to `main` with a `feat`/`fix`/`perf`/breaking commit since the last tag publishes to nuget.org, tags and creates a GitHub release. GitVersion no longer burns numbers on docs commits. `main` protected | ADR-0017 | P03 | done |
 
 ### Outlines
 
